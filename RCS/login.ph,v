@@ -1,0 +1,11 @@
+head	;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+
+desc
+@copy of loc_login without the loc_
+@

@@ -1,0 +1,1430 @@
+head	1.20;
+access;
+symbols;
+locks;
+comment	@# @;
+
+
+1.20
+date	2007.12.04.06.16.50;	author dmenconi;	state Exp;
+branches;
+next	1.19;
+
+1.19
+date	2007.12.04.05.54.57;	author dmenconi;	state Exp;
+branches;
+next	1.18;
+
+1.18
+date	2007.12.03.20.09.35;	author dmenconi;	state Exp;
+branches;
+next	1.17;
+
+1.17
+date	2007.12.03.19.18.24;	author dmenconi;	state Exp;
+branches;
+next	1.16;
+
+1.16
+date	2007.12.03.01.05.41;	author dmenconi;	state Exp;
+branches;
+next	1.15;
+
+1.15
+date	2007.12.02.04.44.16;	author dmenconi;	state Exp;
+branches;
+next	1.14;
+
+1.14
+date	2007.10.08.15.44.01;	author dmenconi;	state Exp;
+branches;
+next	1.13;
+
+1.13
+date	2007.07.10.15.51.11;	author dmenconi;	state Exp;
+branches;
+next	1.12;
+
+1.12
+date	2007.07.09.06.45.33;	author dmenconi;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2007.06.24.00.49.14;	author dmenconi;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2007.06.24.00.00.18;	author dmenconi;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2007.06.23.23.39.24;	author dmenconi;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2007.06.23.23.10.32;	author dmenconi;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2007.06.12.21.44.28;	author dmenconi;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.06.12.19.58.04;	author dmenconi;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.06.12.18.28.43;	author dmenconi;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.06.12.00.42.20;	author dmenconi;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2007.06.12.00.36.05;	author dmenconi;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2007.06.10.16.00.17;	author dmenconi;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2007.05.11.15.51.31;	author dmenconi;	state Exp;
+branches;
+next	;
+
+
+desc
+@collection of routines dealing with lists; display, edit, add
+@
+
+
+1.20
+log
+@moved menu below title
+@
+text
+@<?php
+ /*
+  	Copyright 2007 Dave Menconi
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+/* $Id: list.php,v 1.19 2007/12/04 05:54:57 dmenconi Exp $ */
+/**
+ * ListData
+ * PARAMETERS
+ * $link: active link to a database
+ * $fieldinfo array of field data
+    Each field has 2 variables, "title" and "field". 
+		"field" is the field name in the database (and, also, in the form) 
+		"title" is the name it's to be displayed by
+ * $dbinfo This has several pieces of information in it. 
+        -- collectively the filter information is so that the user can select one field in the data to filter on
+		- filter = is the name of the field that the user can filter on (a field in the filtertable table)
+		- filtertable = is the table that has the possible values in this field
+        - filterfield = is the field in the table that contains the names we're going to filter on
+        - filtertableidfield = is the name of the field in the table that contains the unique unary index
+		- index = is the unary index that we're going to use for editing a specific record -- it must be unique!
+        -- collectively = the next few things are for doing a mysql select; necessary because the logic of the list will need to change the select
+        - fieldnames: = the fields we want to extract from the database
+        - tablenames = the tables that we want to get
+        - where = the pieces of the where clause; these will all be put together by ands
+        - order = the order you want in the select by default -- this will be overridden by the sort so I'm not sure it's useful
+ * $displayinfo
+	- mastertitle = the title that the page should have SHOULD NOT contain "list" 
+	- actionkeyword = the name of the parameter that causes this page to be displayed
+	- listname = the value of the keyword that causes this to be displayed
+	- addname = the value of the action url variable that will result in an add
+	- editname = the keyword to use to get something to be editd
+	- editfield  = one of the columns in the displayed table will have links to edit the field; this is the name of the field we want to put the edit link on
+    - editindexkeyword = the name of the url keyword that we will use for the index (how about "indexno") 
+	- editindexfield = the name of the field whose value is the index
+	- menu = a menu string (in html) that we'll display at the top of the page to allow people to find other parts of the system
+	- css = the url of the css file
+thus <a href=$self?$actionkeyword=$editname&$editindexkeyword=$database[$editindexfield]> {editname}</a>
+	- color: the background color of the page
+ * $PARAMS the get and post parameters
+ * $PageLengths  a list of the possible page lengths that you want; it has good defaults
+ */
+/* 
+********* BUGS TODO ********
+no alpha menu (?)
+//TODO gamesname and typename are sometimes undefined so they need to be isset checked
+//TODO at one point  $pagelenidx had a value of 25 which it should never have
+//TODO alphamenu is used so it needs to be defined or removed
+*/
+function ListData($link,$fieldinfo,$dbinfo,$displayinfo,$PARAMS,$PageLengths=""){
+debug_string("==== ListData() ====");
+    //================= Define Some Constant Tables ======================
+    // define table headings and field names
+    if ($PageLengths=="")$PageLengths = array(25,50,75,100,200,300);
+    $listkeywords = array("first","page","sort","filtervalue");
+    $listdefaults = array("first"=>"0","page"=>"25", "sort"=>"0", "filtervalue"=>"0");
+
+    //================= Get the display parameters ========================
+debug_string("================= Get the display parameters ========================");
+	$mastertitle = $displayinfo['mastertitle'];
+	$color = $displayinfo['color'];
+	$listname = $displayinfo['listname'];	
+	$actionkeyword = $displayinfo['actionkeyword'];	
+	$addname = $displayinfo['addname'];	
+    $self=$_SERVER['PHP_SELF'];
+	$url = $self."?".$actionkeyword."=".$listname;
+	$editname = $displayinfo['editname'];	
+	$editfield = $displayinfo['editfield'];	
+	$editindexkeyword = $displayinfo['editindexkeyword'];	
+	$editindexfield = $displayinfo['editindexfield'];	
+    $menu =  '<b><center>'. "<a href=\"$self?$actionkeyword=$addname\">Add Record</a> ".  '</center></b>';
+//debug_string("actionkeyword",$actionkeyword);
+//debug_string("listname",$listname);
+	if (isset($displayinfo['menu']))	$menu = $displayinfo['menu'];
+	if (isset($displayinfo['css']))		$css  = $displayinfo['css'];
+
+    //================= get the list parameters =======================
+    //debug_string("//================= get the list parameters =======================");
+	$cookiename = $dbinfo['tablenames'][0]."ListParams";
+	//debug_string("cookiename",$cookiename);	
+//debug_array("listkeywords",$listkeywords);
+	foreach ($listkeywords as $i => $keyword){
+        if(isset($PARAMS[$keyword])) {
+            $listparams[$keyword]=$PARAMS[$keyword];
+//debug_string("$keyword",$listparams[$keyword]);
+        }
+        else if(isset($_COOKIE[$cookiename])){
+//debug_string("cookie set ");
+            $listparams[$keyword]=$_COOKIE[$cookiename][$i];
+//debug_string("$keyword",$listparams[$keyword]);
+ 		}else{ 
+//debug_string("default ");
+			$listparams[$keyword]=$listdefaults[$keyword];
+//debug_string("$keyword",$listparams[$keyword]);
+ 		} 
+		$thiscookie = $cookiename."[".$i."]";
+//debug_string("thiscookie",$thiscookie);
+
+		setcookie($thiscookie,$listparams[$keyword],0);
+ 	} 
+//debug_array("listparams",$listparams);
+//debug_string("end of list parameters");
+
+    // get the list of filternames
+    //================= Get Data From filter Table ====================
+	$filterflag = true;
+	if (!isset($dbinfo['filtertable'])) $filterflag=false;
+	if ($filterflag){
+		$filtersql = "select * from ". $dbinfo['filtertable'];
+//		debug_string("filtersql",$filtersql);
+		$data = MYSQLGetData($link,$filtersql);
+		$idfield = $dbinfo['filtertableidfield'];
+		$filterfield = $dbinfo['filterfield'];
+		foreach($data as $value){
+//			debug_array("value",$value);
+			$filterdata[$value[$idfield]] =	$value[$filterfield];
+		}
+	}
+//	debug_array("data",$data);
+//	debug_string("idfield",$idfield);
+//	debug_string("filterfield",$filterfield);
+//	debug_array("filterdata",$filterdata);
+    //================= Get Data From Database =======================
+
+	$order = $dbinfo['order'];
+    $order[] = $fieldinfo[$listparams['sort']]['field'];
+
+	$where = $dbinfo['where'];
+	$filtervalue = $listparams['filtervalue'];
+	if (isset($filterdata[$filtervalue])){//if we're looking for a value that exists...
+		$where[] = $dbinfo['filter'].'='.$listparams['filtervalue'];
+	} 
+    $records = MYSQLComplexSelect($link, $dbinfo['fieldnames'],$dbinfo['tablenames'],$where,$order,0);
+    $recordcount = count($records);
+	if ($recordcount<1){
+		foreach ($listkeywords as $i => $keyword){
+			$thiscookie = $cookiename."[".$i."]";
+			setcookie($thiscookie,"",time()-60);
+		}
+    	Display_Generic_Header("$mastertitle List",$color,$css);
+		print "	<div class=\"listpage\"><center>\n<h1>$mastertitle Display Page</h1></center>\n <center><b>No Records Found</b></center>\n<center><a href=\"$self?$actionkeyword=$listname\">Return to List</a></div>\n";
+		return;
+	}
+//TODO alphamenu is used so it needs to be defined or removed
+    //$alphamenu = alphalist($records);
+
+    //================= Calculate paging information ======================
+    // $end -- we're at the end of the file, there is no next
+    // $start -- we're at the start of the file, there is no start
+    // $pagelen -- how many line show on a page
+    // $firstline -- the first lines to show on the page
+    // $lastline -- the last line to show on the page
+    // $prevline -- if the user clicks on "previous", what's the first line going to be?
+    // $nextline -- if the user clicks on "next" what's the first line going to be?
+    // $pagelist -- array of line starts and ends for page menu
+    // $pagemenu -- actual page menu in HTML
+    // $startline -- first line of the firt page
+    // $endline -- first line of thelast page
+
+    $firstline = $listparams['first'];
+	$pagelenidx = $listparams['page']; 
+//TODO at one point  $pagelenidx had a value of 25 which is should never have
+	$pagelen = $PageLengths[$pagelenidx];
+    $end = false;
+    $start = false;
+    if ($pagelen<=25) $pagelen=25;
+    if ($firstline<0) $firstline=0;
+    if ($pagelen>$recordcount) $pagelen=$recordcount;
+    $lastline = $firstline+$pagelen-1;
+    if ($lastline>$recordcount) $lastline=$recordcount;
+    if ($lastline >= $recordcount-$pagelen)$end=true;
+    if ($firstline == 0) $start = true;
+
+
+    $prevline = $firstline-$pagelen;
+    if ($prevline<0) $prevline=0;
+    $nextline = $firstline+$pagelen;
+    if ($nextline>$recordcount)$nextline=$recordcount;
+    $endline = $recordcount-$pagelen+1;
+    $startline = 0;
+
+    $previousparams = "first=$prevline";
+    $firstparams = "first=$startline";
+    if (!$start){
+        $prevhtml = "<a href=\"$url&".$previousparams."\">Previous</a>";
+        $firsthtml = "<a href=\"$url&".$firstparams."\">First</a>";
+    } else {
+        $prevhtml = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+        $firsthtml = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+    }
+    $nextparams = "first=$nextline";
+    $lastparams = "first=$endline";
+    if (!$end) {
+        $nexthtml = "<a href=\"$url&".$nextparams."\">Next</a>";
+        $lasthtml = "<a href=\"$url&".$lastparams."\">Last</a><br>";
+    } else {
+        $nexthtml = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+        $lasthtml = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>";
+    }
+
+    // page menu calculations
+    $totalpages = intval($recordcount/$pagelen)+1;
+    $p=1;
+    //$pagemenu ="Pages: ";
+
+    $pagemenu = "";
+    for($l=0;$l<$recordcount;$l+=$pagelen){
+        $pagelist[$p]['start'] = $l;
+        $pagelist[$p]['end']= $l+$pagelen-1;
+        if($firstline>=$l && $firstline<=$l+$pagelen-1){
+            $currentpage=$p;
+            $pagemenu .= " $p ";
+        }else{
+            $pagemenu .= " <a href=\"$url&first=$l\">$p</a> ";
+        }
+        $p++;
+    }
+
+    //======================== Draw Screen ===========================
+   	Display_Generic_Header("$mastertitle List",$color,$css);
+   	print " \n<div class=\"listpage\"> \n";
+    //WriteBody($firstline,$lastline);
+    	//debug_string("listparams[filtervalue]",$listparams['filtervalue']);
+	if ($filterflag){
+		//debug_string("filterflag set");
+		//create filter pulldown menu
+	    $filteroption = "&nbsp;&nbsp;<b>Filter by:</b> <select name=\"filtervalue\"><option value=\"0\">All";
+		foreach($filterdata as $id=>$name){
+			//debug_string("id $id",$name);
+	        $optionname = $name;
+	        $optionvalue = $id;
+	        $filteroption .= "<option value=\"".$optionvalue."\"";
+	        if($listparams['filtervalue']==$id)$filteroption .= " selected ";
+	        $filteroption .= ">".$optionname;
+	    }
+	    $filteroption .= '</select>';
+	 $filteroption .= '<input type="hidden" name="first" value="0">';
+	}
+//create sort pulldown menu
+
+    $sortoption = "&nbsp;&nbsp;<b>Sort by:</b> <select name=\"sort\">";
+    for ($i=0;$i<count($fieldinfo);$i++){
+        $sortoption .= "<option value=\"".$i."\"";
+		if($listparams['sort']==$i)$sortoption .= " selected ";
+        $sortoption .=">" . $fieldinfo[$i]['title'];
+    }
+    $sortoption .= '</select>';
+// create heading
+    $headings = "";
+    for ($i=0;$i<count($fieldinfo);$i++){
+        $headings .= "<td><center><b><a href=\"$url&sort=" . $i . "\">" . $fieldinfo[$i]['title'] . "</b></font></a></td>";
+    }
+
+//create page length pulldown menu
+    $pageoption =  "&nbsp;&nbsp;<b>Page Size:</b> <select name=\"page\">";
+	foreach ($PageLengths as $index => $lines){
+        $pageoption .= "<option value=\"".$index."\"";
+		if($listparams['page']==$index)$pageoption .= " selected ";
+        $pageoption .= ">" . $lines;
+	}
+
+    $pageoption .= '</select>';
+//TODO gamesname and typename are sometimes undefined so they need to be isset checked
+    $usermayedit =  true;
+    // create record list html
+    $datalist = "";
+    for($i=$firstline;$i<=$lastline;$i++){
+        if (fmod($i,2)==0)$class=" class=\"odd\" ";
+       	else $class=" class=\"even\" ";
+        // modify the record information before we try to output it (hey, that's cheating!)
+        //$records[$i]['rawname'] = $records[$i]['gamesname'];
+		if($records[$i][$editfield]=="")$records[$i][$editfield]="&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+        $records[$i][$editfield] = "</center><a href=\"$self?$actionkeyword=$editname&$editindexkeyword=" . $records[$i][$editindexfield] . "\">" . $records[$i][$editfield]. "</a>";
+        if ($usermayedit)$records[$i]['gamesname'] .= "<font size=-2><i>Edit</font></i></a>";
+        //$records[$i]['gamesname'] .= "</i></a>";
+        /*if (isset($records[$i]['description'])){
+            $records[$i]['description'] = substr($records[$i]['description'],0,60);
+        } else {
+            $records[$i]['description'] = "&nbsp";
+        }
+		*/
+        // now step through the fields and output information
+        $datalist .= "<tr $class>\n";
+        for($j=0;$j<count($fieldinfo);$j++){
+            if(!isset( $records[$i][$fieldinfo[$j]['field']])){
+                $records[$i][$fieldinfo[$j]['field']]="&nbsp;";
+            }
+            $datalist .= "\t<td>" . $records[$i][$fieldinfo[$j]['field']] . "&nbsp;</td>\n";
+        }
+        if($records[$i]['typename']=="Raw"){
+            $datalist .= "\t<td><a href=\"http://clusty.com/search?tb=firefox-1.0.3&query=".$records[$i]['rawname']."\"><font size=-2><i>Web Search</i></font></a></td>";
+        }
+        $datalist .= "</tr>\n\n";
+    } //for($i)
+//debug_string("actionkeyword",$actionkeyword);
+//debug_string("listname",$listname);
+echo <<< EOF
+<center><h1>$mastertitle Display Page</h1></center>
+<div class="listmenu">
+$menu
+</div>
+
+<center><h2>Display Settings</h2></center>
+
+ <div class="listpagecontrols">
+<center> <FORM action="$self" method="get">
+ <input type="hidden" name="$actionkeyword" value="$listname">
+$sortoption
+$filteroption
+$pageoption
+ <input type="submit" value="Display">
+ </form>
+ </div>
+</center>
+<center>
+<div class="listsubtitle">
+	<center><font size=+2><b>$mastertitle List </b></font></center>
+	<center><font size=+1> <i>($recordcount lines)</i></font></h2></center>
+</div>
+</center>
+<center>
+<div class="listpagemenu">
+$alphamenu<br>
+<center>$firsthtml &nbsp; &nbsp; &nbsp; &nbsp; $prevhtml &nbsp; &nbsp; $pagemenu &nbsp; &nbsp; $nexthtml&nbsp; &nbsp; &nbsp; &nbsp; $lasthtml</center>
+</div>
+</center>
+<center><table border=1>
+    <tr>
+        $headings
+    </tr>
+    $datalist
+
+</table>
+
+</center>
+<center>$firsthtml &nbsp; &nbsp; &nbsp; &nbsp; $prevhtml &nbsp; &nbsp; &nbsp; &nbsp; $nexthtml&nbsp; &nbsp; &nbsp; &nbsp; $lasthtml</center>
+<br><br>
+EOF;
+}
+function alphalist($companies){
+    $alpha=array();
+    for ($i=count($companies)-1;$i>=0;$i--){
+        $name=ucfirst($companies[$i]['name']);
+
+        $initial = substr($name,0,1);
+        $alpha[$initial] = $i;
+    }
+    asort($alpha);
+
+    $alphamenu = "";
+    foreach ($alpha as $initial=>$count){
+        $alphamenu .= "<a href=\"$url&first=$count\">$initial</a> ";
+    }
+    return($alphamenu);
+}
+
+/** 
+ * 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function ParseAddRecord($link,$tablename,$params,$defaults=array()){
+	// set up empty lists, start as first
+	$valuelist = "";
+	$fieldlist = "";
+	$first = true;
+	// step through defaulst and add them to params as necessary
+	foreach($defaults as $name=>$value){
+		if(!isset($params[$name])) $params[$name]=$value;
+	}
+
+	// step through params and build sql field list and valuelist for insert
+	foreach($params as $name=>$value){ 
+		if($name=="mode")continue;//skip mode param
+		// after first time we need commas for the SQL statement 
+		if (!$first){
+			$valuelist.=",";
+			$fieldlist.=",";
+		} else {
+			$first =false;
+		}
+		//add the name/value pair to the value list and field list for SQL statement
+		$valuelist .= "'".$value."'";
+		$fieldlist .= $name;
+	}//foreach
+
+	// create insert statement
+	$sql = "insert $tablename ($fieldlist) values ($valuelist)";
+	//	do it. 
+	mysql_insert($link,$sql,true);
+}//function Parse...
+
+/** 
+ * 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function AddRecord($link,$tablename,$datanames,$mode){
+	$fieldnames = array_keys($datanames);
+	$result .= "<center><h2>Add Record</h2></center>\n";
+	$result .= " <FORM action=\"index.php\" method=\"post\">\n";
+	$result .= " <input type=\"hidden\" name=\"mode\" value=\"$mode\">\n";
+	$result .= " <input type=\"submit\" value=\"Add\">\n";
+	$result .= " <table border=0>\n";
+
+	foreach($datanames as $name=>$title){ 
+			$result .= " <tr><td><b>$title</b></td><td> <input type=\"text\" name=\"$name\" size=\"50\"></td></tr>\n";
+	}// foreach
+	$result .= " </table>\n";
+	$result .= " <input type=\"submit\" value=\"Add\">\n";
+	$result .= " </form>\n";
+	return $result;
+}
+
+
+/** 
+ * 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ * $link - a live link to a mysql database
+ * $tablename - the name of the table we're editing
+ * $idname - field name of the record id
+ * $params - get/put params from the web field
+ */
+function ParseEditRecord($link,$tablename,$idname,$params,$defaults=array()){
+	//debug_string("ParseEditRecord($tablename,$idname)");
+	$valuelist = "";
+	$first = true;
+	// step through defaulst and add them to params as necessary
+	foreach($defaults as $name=>$value){
+		if(!isset($params[$name])) $params[$name]=$value;
+	}
+	foreach($params as $name=>$value){ 
+		if($name=="mode")continue;//skip mode param // TODO: change this to a variable
+		if($name==$idname){
+			$recordid=$value;
+			continue;
+		}//if
+		if (!$first) $valuelist.=",";
+		else $first =false;
+		$valuelist .= $name."='".$value."'";
+	}//foreach
+	$sql = "update $tablename set $valuelist where $idname='$recordid'";
+	mysql_update($link,$sql,true);
+}//function Parse...
+
+/** 
+ * EditRecord - returns a form to edit a record
+ * This routine creates a string that contains a form that will allow the user to edit the data in the record 
+ * and then pass the data back to the calling program via post;
+ * that program must look for mode=$mode in the post data 
+ * and then pass that data on to the ParseEditRecord() routine so the data can be updated. 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ * $link - connection to the mysql database 
+ * $tablename - name of the table we're getting the record from. 
+ * $idname - field name of the unique identifiyer of this records 
+ * $recordid - id value of the record we're to edit
+ * $datanames - associative array: the keys are the names of fields in the database, the data are the titles you want shown in the form
+ * $mode - what to set the mode variable to get to the code to parse the results
+ */
+function EditRecord($link,$tablename,$idname,$recordid,$datanames,$mode){
+    $self=$_SERVER['PHP_SELF'];
+	//debug_string("Editrecord()");
+	$fieldnames = array_keys($datanames);
+	$record = MYSQLComplexSelect($link,$fieldnames,array($tablename),array($idname."='".$recordid."' "),array(),0);
+	$record = $record[0];
+	$result .= "<center><h2>Edit Record</h2></center>\n";
+	$result .= " <FORM action=\"$self\" method=\"post\">\n";
+	$result .= " <input type=\"hidden\" name=\"mode\" value=\"$mode\">\n";
+	$result .= " <input type=\"hidden\" name=\"$idname\" value=\"$recordid\">\n";
+	$result .= " <input type=\"submit\" value=\"Update\">\n";
+	$result .= " <table border=0>\n";
+
+	foreach($record as $name=>$default){ 
+		$title = $datanames[$name];
+		$size = strlen($default)*2;
+		if ($size<10)$size = 10;
+		if ($size<50){
+			$result .= " <tr><td><b>$title</b></td><td> <input type=\"text\" name=\"$name\" value=\"$default\" size=\"$size\"></td></tr>\n";
+		} else {
+			$result .= " <tr><td valign=top><b>$title&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b></td><td> <textarea name=\"$name\" rows=\"8\" cols=\"80\">$default</textarea></td></tr>\n";
+		}//else
+	}// foreach
+	$result .= " </table>\n";
+	$result .= " <input type=\"submit\" value=\"Update\">\n";
+	$result .= " </form>\n";
+	return $result;
+}
+/**
+ * createmenu
+ * This function creates a form menu based the values in a database table. 
+ * There are two fields in the table that are relevant: the index field and the name field
+ * $link - a valid connection to a database
+ * $table - the name of the table 
+ * $namefld - the field that has the names that will appear in the menu -- this willb e the name
+ * $indexfld - the unique unary index to the table; this will be the value (well, x+this number is the value)
+ * $selected - optional param to identify which entry is shown by default; this number must match the value in the indexfld
+*/
+function createmenu($link,$table,$namefld,$indexfld,$selected=-1){
+    //debug_string("createmenu(link,$table,$namefld,$indexfld)");
+    $sql = "select $namefld,$indexfld from $table order by $namefld";
+    $data = MYSQLGetData($link,$sql);
+    $menu = "<select name=\"$table\">";
+    foreach ($data as $rec){
+        $index=$rec[$indexfld];
+        $name = $rec[$namefld];
+        $menu .= '<option ';
+		if($selected == $index)$menu .=" selected ";
+        $menu .='value="x'.$index.'">'.$name.'</option>';
+    }
+    $menu.="</select>";
+    return $menu;
+}
+
+
+/* 
+ * $Log: list.php,v $
+ * Revision 1.19  2007/12/04 05:54:57  dmenconi
+ * more css class tags added
+ *
+ * Revision 1.18  2007/12/03 20:09:35  dmenconi
+ * fixed a bug with the paging menu going wayward
+ *
+ * Revision 1.17  2007/12/03 19:18:24  dmenconi
+ * add odd and even classes to the list
+ *
+ * Revision 1.16  2007/12/03 01:05:41  dmenconi
+ * now with CSS
+ *
+ * Revision 1.15  2007/12/02 04:44:16  dmenconi
+ * added a description of a crucial field for filtering (the filteridfield)
+ *
+ * Revision 1.14  2007/10/08 15:44:01  dmenconi
+ * added code to parseedit and parseadd to handle defaults
+ *
+ * Revision 1.13  2007/07/10 15:51:11  dmenconi
+ * made display pulldown menus persistent & removed debug stuff
+ *
+ * Revision 1.12  2007/07/09 06:45:33  dmenconi
+ * added to createmenu the ability to have a default
+ *
+ * Revision 1.11  2007/06/24 00:49:14  dmenconi
+ * added a link to the no record page; fixed a naming problem
+ *
+ * Revision 1.10  2007/06/24 00:00:18  dmenconi
+ * check point
+ *
+ * Revision 1.9  2007/06/23 23:39:24  dmenconi
+ * fixed zero record problem, added menus
+ *
+ * Revision 1.8  2007/06/23 23:10:32  dmenconi
+ * checkpoint
+ *
+ * Revision 1.7  2007/06/12 21:44:28  dmenconi
+ * fixed numbering problem (the count was defined as count($records)-1 -- go figure!)
+ *
+ * Revision 1.6  2007/06/12 19:58:04  dmenconi
+ * removed another debug statement
+ *
+ * Revision 1.5  2007/06/12 18:28:43  dmenconi
+ * fixed case where filed we put the edit link has no characters in it.
+ *
+ * Revision 1.4  2007/06/12 00:42:20  dmenconi
+ * removed all comments
+ *
+ * Revision 1.3  2007/06/12 00:36:05  dmenconi
+ * removed $type from list.php
+ *
+ * Revision 1.2  2007/06/10 16:00:17  dmenconi
+ * removed all debug_ calls
+ *
+ * Revision 1.1  2007/05/11 15:51:31  dmenconi
+ * Initial revision
+ *
+ */
+?>
+@
+
+
+1.19
+log
+@more css class tags added
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.18 2007/12/03 20:09:35 dmenconi Exp $ */
+d309 1
+a312 1
+<center><h1>$mastertitle Display Page</h1></center>
+d526 3
+@
+
+
+1.18
+log
+@fixed a bug with the paging menu going wayward
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.17 2007/12/03 19:18:24 dmenconi Exp $ */
+d232 1
+a232 1
+   	print " <div class=\"listpage\"> \n";
+d313 1
+a313 1
+<center>
+d326 8
+a333 2
+<center><font size=+2><b>$mastertitle List </b></font></center>
+<center><font size=+1> <i>($recordcount lines)</i></font></h2></center>
+d336 2
+a337 1
+
+d526 3
+@
+
+
+1.17
+log
+@add odd and even classes to the list
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.16 2007/12/03 01:05:41 dmenconi Exp $ */
+d197 1
+a197 1
+        $firsthtml = "<a href=\"$url&".$firstparams."\">first</a>";
+d329 1
+a329 1
+$firsthtml &nbsp; &nbsp; &nbsp; &nbsp; $prevhtml &nbsp; &nbsp; $pagemenu &nbsp; &nbsp; $nexthtml&nbsp; &nbsp; &nbsp; &nbsp; $lasthtml
+d340 1
+a340 1
+$firsthtml &nbsp; &nbsp; &nbsp; &nbsp; $prevhtml &nbsp; &nbsp; &nbsp; &nbsp; $nexthtml&nbsp; &nbsp; &nbsp; &nbsp; $lasthtml
+d519 3
+@
+
+
+1.16
+log
+@now with CSS
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.15 2007/12/02 04:44:16 dmenconi Exp $ */
+d152 1
+a152 1
+		print "	<center><h1>$mastertitle Display Page</h1></center>\n <center><b>No Records Found</b></center>\n<center><a href=\"$self?$actionkeyword=$listname\">Return to List</a>\n";
+d232 1
+d251 1
+d279 2
+d294 1
+a294 1
+        $datalist .= "<tr>\n";
+d309 1
+d311 2
+a312 1
+ <center><h1>$mastertitle Display Page</h1></center>
+d316 1
+d324 1
+d519 3
+@
+
+
+1.15
+log
+@added a description of a crucial field for filtering (the filteridfield)
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.14 2007/10/08 15:44:01 dmenconi Exp $ */
+d48 1
+d86 1
+d151 1
+a151 1
+    	Display_Generic_Header("$mastertitle List",$color);
+d231 1
+a231 1
+    Display_Generic_Header("$mastertitle List",$color);
+d511 3
+@
+
+
+1.14
+log
+@added code to parseedit and parseadd to handle defaults
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.13 2007/07/10 15:51:11 dmenconi Exp $ */
+d28 1
+a28 1
+		- filter = is the name of the field that the user can filter on (a field in the tablenames table)
+d31 1
+d44 1
+a44 1
+	- editfield  = the name of the field we want to put the edit link on
+d119 1
+a119 1
+		debug_string("filtersql",$filtersql);
+d124 1
+d128 4
+d509 3
+@
+
+
+1.13
+log
+@made display pulldown menus persistent & removed debug stuff
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.12 2007/07/09 06:45:33 dmenconi Exp $ */
+d19 1
+a53 1
+pulldowns don't reflect current values
+d60 1
+a60 1
+//debug_string("==== ListData() ====");
+d68 1
+a68 1
+//debug_string("================= Get the display parameters ========================");
+d118 1
+d349 2
+a350 1
+function ParseAddRecord($link,$tablename,$params){
+d354 6
+d362 1
+d369 1
+d373 2
+d376 1
+d410 1
+a410 1
+function ParseEditRecord($link,$tablename,$idname,$params){
+d414 4
+d503 3
+@
+
+
+1.12
+log
+@added to createmenu the ability to have a default
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.11 2007/06/24 00:49:14 dmenconi Exp $ */
+d56 1
+a56 1
+//TODO at one point  $pagelenidx had a value of 25 which is should never have
+d60 1
+a65 1
+	// what program are we running
+d67 2
+d81 2
+a82 2
+debug_string("actionkeyword",$actionkeyword);
+debug_string("listname",$listname);
+d84 3
+a86 1
+    //================= get the basic list parameters =======================
+d88 2
+a89 2
+	debug_string("cookiename",$cookiename);	
+debug_array("listkeywords",$listkeywords);
+a91 1
+debug_string("params ");
+d93 1
+a93 1
+debug_string("$keyword",$listparams[$keyword]);
+d96 1
+a96 1
+debug_string("cookie set ");
+d98 1
+a98 1
+debug_string("$keyword",$listparams[$keyword]);
+d100 1
+a100 1
+debug_string("default ");
+d102 1
+a102 1
+debug_string("$keyword",$listparams[$keyword]);
+d105 1
+a105 1
+debug_string("thiscookie",$thiscookie);
+d109 3
+a111 1
+debug_array("list params",$listparams);
+d224 1
+d226 1
+d230 1
+d233 3
+a235 1
+	        $filteroption .= "<option value=\"".$optionvalue."\">".$optionname;
+d243 3
+a245 1
+        $sortoption .= "<option value=\"".$i."\">" . $fieldinfo[$i]['title'];
+d257 3
+a259 1
+        $pageoption .= "<option value=\"".$index."\">" . $lines;
+d293 2
+a294 2
+debug_string("actionkeyword",$actionkeyword);
+debug_string("listname",$listname);
+d486 3
+@
+
+
+1.11
+log
+@added a link to the no record page; fixed a naming problem
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.10 2007/06/24 00:00:18 dmenconi Exp $ */
+d443 11
+a453 1
+function createmenu($link,$table,$namefld,$indexfld){
+d455 1
+a455 1
+    $sql = "select $namefld,$indexfld from $table";
+d461 3
+a463 2
+        $menu = '
+<option value="x'.$index.'">'.$name.'</option>';
+d472 3
+@
+
+
+1.10
+log
+@check point
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.9 2007/06/23 23:39:24 dmenconi Exp $ */
+d39 1
+a39 1
+	- actionname = the value of the keyword that causes this to be displayed
+d69 1
+a69 1
+	$actionname = $displayinfo['actionname'];	
+d73 1
+a73 1
+	$url = $self."?".$actionkeyword."=".$actionname;
+d79 2
+d84 2
+a85 1
+		
+d88 1
+d90 1
+d93 1
+d95 1
+d97 1
+d99 1
+d102 2
+d106 1
+d138 1
+a138 1
+		print "	<center><h1>$mastertitle Display Page</h1></center>\n <center><b>No Records Found</b></center>\n";
+d279 2
+d288 1
+a288 1
+ <input type="hidden" name="$actionkeyword" value="$actionname">
+d461 3
+@
+
+
+1.9
+log
+@fixed zero record problem, added menus
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.8 2007/06/23 23:10:32 dmenconi Exp $ */
+a52 1
+It tries to display when there are no records
+a66 2
+    $menu =  '<b><center>'. "<a href=\"$self?$actionkeyword=$addname\">Add Record</a> |".  '</center></b>';
+	if (isset($displayinfo['menu']))	$menu = $displayinfo['menu'];
+d69 1
+a69 1
+	$actionname = $displayinfo['listname'];	
+d78 2
+d82 1
+a93 2
+// setcookie('GaListParams['.$i.']',$listparams[$keyword],0);
+
+d121 4
+a273 1
+ <input type="hidden" name="mode" value="list">
+d447 3
+@
+
+
+1.8
+log
+@checkpoint
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.7 2007/06/12 21:44:28 dmenconi Exp $ */
+d27 9
+a35 9
+		- filter is the name of the field that the user can filter on (a field in the tablenames table)
+		- filtertable is the table that has the possible values in this field
+        - filterfield is the field in the table that contains the names we're going to filter on
+		- index is the unary index that we're going to use for editing a specific record -- it must be unique!
+        -- collectively the next few things are for doing a mysql select; necessary because the logic of the list will need to change the select
+        - fieldnames: the fields we want to extract from the database
+        - tablenames the tables that we want to get
+        - where the pieces of the where clause; these will all be put together by ands
+        - order the order you want in the select by default -- this will be overridden by the sort so I'm not sure it's useful
+d37 9
+a45 8
+	- mastertitle the title that the page should have SHOULD NOT contain "list" 
+	- actionkeyword the name of the parameter that causes this page to be displayed
+	- actionname the value of the keyword that causes this to be displayed
+	- addname the value of the action url variable that will result in an add
+	- editname the keyword to use to get something to be editd
+	- editfield  the name of the field we want to put the edit link on
+    - editindexkeyword the name of the url keyword that we will use for the index (how about "indexno") 
+	- editindexfield the name of the field whose value is the index
+d52 1
+a52 1
+********* BUGS ********
+d55 4
+a58 2
+no alpha menu
+can't edit anything!
+d67 3
+a80 1
+	
+a82 2
+//debug_array("dbinfo",$dbinfo);
+//debug_string("cookiename",$cookiename);
+a83 1
+//debug_string("-=-=-=-=-=-=-=-=-=-=-=- listkeywords ($i)=>",$keyword);
+a85 1
+		//debug_string("Param",$listparams[$keyword]);
+a88 1
+			//debug_string("cookie",$listparam[$keyword]);
+a90 1
+			//debug_string("default",$listparams[$keyword]);
+a92 2
+	//debug_string("thiscookie",$thiscookie);
+	//debug_string("listparams in cookie",$listparams[$keyword]);
+a96 12
+	//debug_on();
+//debug_array("listparams",$listparams);
+//debug_string("cookies",$_COOKIE[$cookiename]);
+//debug_array("dbinfo",$dbinfo);
+//debug_array("listdefaults",$listdefaults);
+ //debug_string("sort result",$listparams['sort']);
+ //debug_array("listkeywords",$listkeywords);
+ //debug_string("Listdata()");
+//debug_array("fieldinfo",$fieldinfo);
+//debug_array("dbinfo",$dbinfo);
+//debug_array("displayinfo",$displayinfo);
+//debug_array("PARAMS",$PARAMS);
+a102 1
+		//debug_string("filtersql",$filtersql);
+a108 1
+		//debug_array("filterdata",$filterdata);
+a112 2
+//debug_array("listparams",$listparams);
+//debug_array("fieldinfo",$fieldinfo);
+a113 1
+//debug_array("order",$order);
+a116 1
+//debug_string("filtervalue",$filtervalue);
+a117 1
+//debug_string("isset: yes");
+a118 2
+//debug_string("dbinfo['filter']",$dbinfo['filter']);
+//debug_string("listparams['filtervalue']",$listparams['filtervalue']);
+a119 6
+	//else debug_string("isset: no");
+//debug_array("where",$where);
+    //debug_array("filterclause",$filterclause);
+//debug_string("sortfield",$sortfield   );
+//debug_array("dbinfo",$dbinfo);
+//debug_array("fields",$dbinfo['fields']);
+d122 5
+a126 2
+    //debug_string("recordcount",$recordcount);
+//debug_array("records",$records);
+a128 1
+//debug_string("alphamenu",$alphamenu);
+a156 5
+    //debug_string("pagelen",$pagelen);
+    //debug_string("firstline",$firstline);
+    //debug_string("lastline",$lastline)+1;
+//if($start)debug_string("start=true");
+//if($end)debug_string("end=true");
+a189 1
+    //debug_string("firstline",$firstline);
+a200 19
+    //debug_string("currentpage",$currentpage);
+    //debug_string("<hr>pagemenu",$pagemenu."<hr>");
+    //debug_string("totalpages",$totalpages);
+    //debug_string("p",$p);
+    //debug_string("l",$l);
+    //debug_array("pagelist",$pagelist);
+
+//debug_string("firstline",$firstline);
+//debug_string("lastline",$lastline);
+//debug_string("prevline",$prevline);
+//debug_string("nextline",$nextline);
+//debug_string("startline",$startline);
+//debug_string("endline",$endline);
+    //debug_array("records",$records);
+    //debug_string("record count",$recordcount);
+
+    //$types = MYSQLComplexSelect($link,array("*"),array("type"),array(),array("typeid desc"),0);
+    //debug_array("types",$types);
+    //debug_string("type count",$typecount);
+a214 1
+	      //debug_string("<hr>filteroption",$filteroption);
+a221 1
+    //debug_string("<hr>sortoption",$sortoption);
+a226 1
+    //debug_string("<hr>headings",$headings);
+a234 1
+//debug_string("pageoption",$pageoption);
+a264 7
+    //debug_string("<hr>",$datalist);
+    //debug_string("<hr>");
+	$menu = "";
+    $menu =  '<b><center>';
+    $menu .=  "<a href=\"$self?$actionkeyword=$addname\">Add Record</a> |";
+    //$menu .= ' <a href="$self?mode=login">Login</a> | <a href="self?mode=logout">Logout</a> 
+	$menu .= '</center></b>';
+a319 2
+	//debug_string("ParseAddRecord($tablename)");
+	//debug_array("params",$params);
+a333 2
+	//debug_string ("valuelist",$valuelist);
+	//debug_string ("fieldlist",$fieldlist);
+a334 1
+	//debug_string("insertsql",$sql);
+d373 1
+a373 1
+		if($name=="mode")continue;//skip mode param // todo: change this to a variable
+a402 1
+//debug_array("datanames",$datanames);
+a404 1
+//debug_array("recod",$record);
+a413 1
+//debug_string("--------$name=>",$default);
+a414 1
+//debug_string("title",$title);
+a415 1
+//debug_string("size",$size);
+d446 3
+@
+
+
+1.7
+log
+@fixed numbering problem (the count was defined as count($records)-1 -- go figure!)
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.6 2007/06/12 19:58:04 dmenconi Exp $ */
+d114 12
+a125 7
+	$filtersql = "select * from ". $dbinfo['filtertable'];
+	//debug_string("filtersql",$filtersql);
+	$data = MYSQLGetData($link,$filtersql);
+	$idfield = $dbinfo['filtertableidfield'];
+	$filterfield = $dbinfo['filterfield'];
+	foreach($data as $value){
+		$filterdata[$value[$idfield]] =	$value[$filterfield];
+a126 2
+	//debug_array("filterdata",$filterdata);
+
+d150 1
+a150 1
+    $records = MYSQLComplexSelect($link, $dbinfo['fieldnames'],$dbinfo['tablenames'],$where,$order,2);
+d154 1
+a154 1
+
+d173 1
+d258 12
+a269 11
+//create filter pulldown menu
+    $filteroption = "&nbsp;&nbsp;<b>Filter by:</b> <select name=\"filtervalue\"><option value=\"0\">All";
+	foreach($filterdata as $id=>$name){
+        $optionname = $name;
+        $optionvalue = $id;
+        $filteroption .= "<option value=\"".$optionvalue."\">".$optionname;
+    }
+    $filteroption .= '</select>';
+ $filteroption .= '<input type="hidden" name="first" value="0">';
+      //debug_string("<hr>filteroption",$filteroption);
+
+d292 1
+a292 1
+
+a295 3
+debug_on();
+debug_string("lastline",$lastline);
+debug_string("count",count($records));
+a310 1
+$datalist .= "<td>$i</td>";
+d502 14
+d520 3
+@
+
+
+1.6
+log
+@removed another debug statement
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.5 2007/06/12 18:28:43 dmenconi Exp $ */
+d147 2
+a148 2
+    $records = MYSQLComplexSelect($link, $dbinfo['fieldnames'],$dbinfo['tablenames'],$where,$order,0);
+    $recordcount = count($records)-1;
+d291 3
+d306 1
+a306 1
+*/
+d309 1
+d320 1
+a320 1
+    }
+d431 4
+a436 1
+//debug_on();
+d441 1
+a441 1
+		if($name=="mode")continue;//skip mode param
+d455 5
+a459 1
+ * 
+d461 6
+a472 1
+//debug_array("fieldnames",$fieldnames);
+d505 3
+@
+
+
+1.5
+log
+@fixed case where filed we put the edit link has no characters in it.
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.4 2007/06/12 00:42:20 dmenconi Exp $ */
+d140 2
+a141 1
+	} else debug_string("isset: no");
+d489 3
+@
+
+
+1.4
+log
+@removed all comments
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.3 2007/06/12 00:36:05 dmenconi Exp $ */
+d40 1
+a40 1
+	- addname
+d43 1
+a43 1
+    - editindexkeyword the name of the 
+d292 2
+a293 1
+        $records[$i]['rawname'] = $records[$i]['gamesname'];
+d296 2
+a297 2
+        $records[$i]['gamesname'] .= "</i></a>";
+        if (isset($records[$i]['description'])){
+d302 1
+d488 3
+@
+
+
+1.3
+log
+@removed $type from list.php
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.2 2007/06/10 16:00:17 dmenconi Exp $ */
+d138 2
+a139 2
+debug_string("dbinfo['filter']",$dbinfo['filter']);
+debug_string("listparams['filtervalue']",$listparams['filtervalue']);
+d141 1
+a141 1
+debug_array("where",$where);
+d426 1
+a426 1
+debug_on();
+d486 3
+@
+
+
+1.2
+log
+@removed all debug_ calls
+@
+text
+@d17 1
+a17 1
+/* $Id: list.php,v 1.1 2007/05/11 15:51:31 dmenconi Exp $ */
+d246 1
+a246 1
+    $types = MYSQLComplexSelect($link,array("*"),array("type"),array(),array("typeid desc"),0);
+d486 3
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d17 1
+a17 1
+/* $Id: miscfunc.php,v 1.9 2007/04/13 07:02:32 dmenconi Exp $ */
+d27 1
+a27 1
+		- filter is the name of the field that the user can filter on
+d41 5
+a45 1
+	- editname
+d55 1
+a68 1
+	$editnname = $displayinfo['editname'];	
+d71 5
+d81 1
+a81 1
+debug_string("-=-=-=-=-=-=-=-=-=-=-=- listkeywords ($i)=>",$keyword);
+d84 1
+a84 1
+		debug_string("Param",$listparams[$keyword]);
+d88 1
+a88 1
+			debug_string("cookie",$listparam[$keyword]);
+d91 1
+a91 1
+			debug_string("default",$listparams[$keyword]);
+d95 1
+a95 1
+	debug_string("listparams in cookie",$listparams[$keyword]);
+d100 2
+a101 2
+	debug_on();
+debug_array("listparams",$listparams);
+d111 1
+a111 1
+debug_array("PARAMS",$PARAMS);
+d127 1
+a127 1
+debug_array("listparams",$listparams);
+d134 1
+a134 1
+debug_string("filtervalue",$filtervalue);
+d136 1
+a136 1
+debug_string("isset: yes");
+d293 1
+a293 1
+        $records[$i]['gamesname'] = "</center><a href=\"$url&mode=detail&gameno=" . $records[$i]['gameid'] . "\">" . $records[$i]['gamesname']. "</a> <a href=\"$url&mode=edit&gameno=" . $records[$i]['gameid'] . "\">";
+d426 2
+a427 1
+//	debug_string("ParseEditRecord($tablename,$idname)");
+d449 3
+d453 1
+d455 1
+d458 1
+a458 1
+	$result .= " <FORM action=\"index.php\" method=\"post\">\n";
+d465 1
+d467 1
+d469 1
+d485 4
+a488 1
+ * $Log$
+@

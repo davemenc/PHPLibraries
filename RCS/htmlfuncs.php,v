@@ -1,0 +1,552 @@
+head	1.11;
+access;
+symbols;
+locks;
+comment	@# @;
+
+
+1.11
+date	2008.01.28.18.17.18;	author dmenconi;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2007.12.03.01.09.06;	author dmenconi;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2007.07.09.06.45.57;	author dmenconi;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2007.05.11.15.52.12;	author dmenconi;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2007.03.10.16.27.45;	author dmenconi;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.02.08.09.29.16;	author dmenconi;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.02.06.06.05.05;	author dmenconi;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2005.06.20.14.36.56;	author dave;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2005.03.01.17.38.15;	author dave;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2005.02.07.18.39.31;	author dave;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2005.01.27.06.01.10;	author dave;	state Exp;
+branches;
+next	;
+
+
+desc
+@functions for dealing with html
+@
+
+
+1.11
+log
+@added divs to footers
+removed webmaster link
+@
+text
+@<?php
+ /*
+  	Copyright 2007 Dave Menconi
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+function HTML_Version(){
+	return "$Id: htmlfuncs.php,v 1.10 2007/12/03 01:09:06 dmenconi Exp $";
+}
+function Display_Generic_Header($title,$color="#FFFFFF",$css=""){
+
+$year = Date("Y");
+if ($css!="")$cssline = "<link rel=\"stylesheet\" type=\"text/css\" href=\"$css\" />";
+else $cssline = "";
+
+echo <<<EOF
+<html>
+<head>
+   <meta http-equiv="Content-Type" content="text/html;
+charset=iso-8859-1">
+   <meta name="description" content="$title">
+   <meta name="">
+   <meta name="DISTRIBUTION" content="IU">
+   <meta name="ROBOTS" content="noindex,nofollow">
+   <meta name="revisit-after" content="30 days">
+   <meta name="copyright" content="Copyright © $year Dave Menconi, All
+Rights Reserved">
+
+   <meta name="author" content="Dave Menconi">
+
+   <meta name="rating" content="PG-13">
+   $cssline
+    <Title>$title</title>
+</head>
+<body bgcolor="$color" >
+EOF;
+}
+/***********************************************************
+ Display_Template()
+$template: path to template file
+$delim: delimiter character
+$values: an array of values to be substitued into template
+         the template may contain the delim character followed by
+         a string followed by a space; in this case the string is looked
+         up in the array and the value in the array is substituted
+         if there is no value in the array, the string is replaced with null
+***********************************************************/
+function Display_Template($template,$delim="%",$values=""){
+	//debug_string("Display_Template()");
+	// read the template file ($template)
+	$template = getfile($template);
+	//debug_string("template length",strlen($template));
+	//debug_array("values",$values);
+    // this will loop through, replacing special characters
+    if ($values!=""){
+		while(1){//infinite loop
+			//location of insertion file character
+			$i = strpos($template,$delim);
+			//debug_string("delim location",$i);
+
+			// check for no more insertions
+			if ($i===FALSE){
+				//debug_string("no delim location ");
+				break;
+			}
+
+			//find key (defined as after delim but before space)
+			$i++;// skip delim character
+			$j = strpos($template," ",$i);//find next space
+			//debug_string("keyword end location",$j);
+			$len = $j-$i;//calc length
+			//debug_string("key len",$len);
+			$key = substr($template,$i,$len);//get key
+			//debug_string("key",$key);
+
+			// get value for key
+			$value="";
+			if(isset($values[$key]))	$value = $values[$key];
+			//debug_string("value",$value);
+
+			//replace string in template with actual contents of array
+			$search = $delim.$key;
+			//debug_string("search",$search);
+			$template = str_replace($search,$value,$template);
+		}
+	}
+    //debug_string("done with subst");
+
+    print($template);
+}
+/***********************************************************
+ * Display_Generic_Footer()
+***********************************************************/
+function Display_Generic_Footer($version,$lastmodified){
+$year = Date("Y");
+echo<<<EOF
+		<div class="footer">
+	     <p><font size=-2>Version: $version <br>Last changed on $lastmodified.</font>
+	     <p><font size=-2>This page (including all images) Copyright &copy; $year  Dave Menconi.</font>
+	     </div>
+	     </body>
+</html>
+EOF;
+}
+/***********************************************************
+ *  GetScriptName()
+***********************************************************/
+function GetScriptName(){
+	$thisapp = $_SERVER['SCRIPT_NAME'];
+	$pos = strpos($thisapp,"/",1)+1;
+	//debug_string("pos",$pos);
+	$thisapp = substr($thisapp,$pos);
+	return $thisapp;
+}
+/*
+getfile
+
+$fname: File to open
+
+Open file $fname, read it into a string and return the contents
+*/
+function getfile($fname){
+    //debug_string("getfile($fname)");
+    $fh = @@fopen($fname,'r');
+    if (false===$fh) return false;
+//debug_string("open worked");
+    $data = fread($fh,filesize($fname));
+    if (false === $data) return false;
+//debug_string("read worked");
+    fclose($fh);
+    return $data;
+}
+
+/***********************************************************
+* Create_Column_Heads
+* Input: an associative array
+* Return: A list of bolded titles based on the key of that array
+* Side Effect: none
+***********************************************************/
+function Create_Column_Heads($data){
+	$temp  = array_keys($data);
+	for ($i=0;$i<count($temp);$i++){
+		$temp[$i] = "<b>".ucwords($temp[$i])."</b>";;
+	}
+	return $temp;
+}
+/*
+ * $Log: htmlfuncs.php,v $
+ * Revision 1.10  2007/12/03 01:09:06  dmenconi
+ * added css capability
+ *
+ * Revision 1.9  2007/07/09 06:45:57  dmenconi
+ * checkpoint
+ *
+ * Revision 1.8  2007/05/11 15:52:12  dmenconi
+ * added license information
+ *
+ * Revision 1.7  2007/03/10 16:27:45  dmenconi
+ * back from meissen.org
+ *
+ * Revision 1.1  2007/02/24 21:14:12  dave
+ * Initial revision
+ *
+ * Revision 1.6  2007/02/08 09:29:16  dmenconi
+ * fixed a tiny bug (litterally 1 character) that prevented display_template from working
+ *
+ * Revision 1.5  2007/02/06 06:05:05  dmenconi
+ * comments and spacing
+ * display template routine
+ *
+ * Revision 1.4  2005/06/20 14:36:56  dave
+ * *** empty log message ***
+ *
+ * Revision 1.3  2005/03/01 17:38:15  dave
+ * blank last line can cause problems (?)
+ *
+ * Revision 1.2  2005/02/07 18:39:31  dave
+ * added $Log: htmlfuncs.php,v $
+ * added Revision 1.10  2007/12/03 01:09:06  dmenconi
+ * added added css capability
+ * added
+ * added Revision 1.9  2007/07/09 06:45:57  dmenconi
+ * added checkpoint
+ * added
+ * added Revision 1.8  2007/05/11 15:52:12  dmenconi
+ * added added license information
+ * added
+ * added Revision 1.7  2007/03/10 16:27:45  dmenconi
+ * added back from meissen.org
+ * added
+ * added Revision 1.1  2007/02/24 21:14:12  dave
+ * added Initial revision
+ * added
+ * added Revision 1.6  2007/02/08 09:29:16  dmenconi
+ * added fixed a tiny bug (litterally 1 character) that prevented display_template from working
+ * added
+ * added Revision 1.5  2007/02/06 06:05:05  dmenconi
+ * added comments and spacing
+ * added display template routine
+ * added
+ * added Revision 1.4  2005/06/20 14:36:56  dave
+ * added *** empty log message ***
+ * added
+ * added Revision 1.3  2005/03/01 17:38:15  dave
+ * added blank last line can cause problems (?)
+ * added at end of file
+ * added $Id: htmlfuncs.php,v 1.10 2007/12/03 01:09:06 dmenconi Exp $ in version function
+ *
+ */
+?>
+@
+
+
+1.10
+log
+@added css capability
+@
+text
+@d18 1
+a18 1
+	return "$Id: htmlfuncs.php,v 1.9 2007/07/09 06:45:57 dmenconi Exp $";
+d107 1
+a107 1
+	     <p><a href="mailto:webmaster@@menconi.com">Webmaster</a>
+d109 2
+a110 2
+	     <p><font size=-2>This page (including all images) Copyright &copy; $year  Dave
+	     Menconi.</font>
+d159 3
+d189 3
+d217 1
+a217 1
+ * added $Id: htmlfuncs.php,v 1.9 2007/07/09 06:45:57 dmenconi Exp $ in version function
+@
+
+
+1.9
+log
+@checkpoint
+@
+text
+@d18 1
+a18 1
+	return "$Id: htmlfuncs.php,v 1.8 2007/05/11 15:52:12 dmenconi Exp $";
+d20 1
+a20 1
+function Display_Generic_Header($title,$color="#FFFFFF"){
+d23 3
+d42 1
+d159 3
+d186 3
+d211 1
+a211 1
+ * added $Id: htmlfuncs.php,v 1.8 2007/05/11 15:52:12 dmenconi Exp $ in version function
+@
+
+
+1.8
+log
+@added license information
+@
+text
+@d18 1
+a18 1
+	return "$Id: htmlfuncs.php,v 1.7 2007/03/10 16:27:45 dmenconi Exp $";
+d55 5
+a59 6
+//debug_string("Display_Template()");
+// read the template file ($template)
+$template = getfile($template);
+//debug_string("template length",strlen($template));
+//debug_array("values",$values);
+
+d63 1
+a63 1
+			//location of include file character
+d65 1
+a65 1
+			//debug_string("tick location",$i);
+d67 1
+a67 1
+			// check for no more includes
+d69 1
+a69 1
+				//debug_string("no tick location ");
+d73 4
+a76 4
+			//find key (defined as after tick but before space)
+			$i++;// skip tick
+			$j = strpos($template," ",$i);//find space
+			//debug_string("space location",$j);
+a81 1
+
+a95 2
+
+
+d97 3
+d111 3
+d155 3
+d179 3
+d201 1
+a201 1
+ * added $Id: htmlfuncs.php,v 1.7 2007/03/10 16:27:45 dmenconi Exp $ in version function
+@
+
+
+1.7
+log
+@back from meissen.org
+@
+text
+@d2 15
+d18 1
+a18 1
+	return "$Id: htmlfuncs.php,v 1.1 2007/02/24 21:14:12 dave Exp $";
+d138 13
+d153 3
+d174 3
+d193 1
+a193 1
+ * added $Id: htmlfuncs.php,v 1.1 2007/02/24 21:14:12 dave Exp $ in version function
+@
+
+
+1.6
+log
+@fixed a tiny bug (litterally 1 character) that prevented display_template from working
+@
+text
+@d3 1
+a3 1
+	return "$Id: htmlfuncs.php,v 1.5 2007/02/06 06:05:05 dmenconi Exp $";
+d125 6
+d143 6
+d159 1
+a159 1
+ * added $Id: htmlfuncs.php,v 1.5 2007/02/06 06:05:05 dmenconi Exp $ in version function
+@
+
+
+1.5
+log
+@comments and spacing
+display template routine
+@
+text
+@d3 1
+a3 1
+	return "$Id: htmlfuncs.php,v 1.4 2005/06/20 14:36:56 dave Exp $";
+d40 1
+d43 2
+d47 1
+a47 1
+    if ($value!=""){
+d51 1
+a51 1
+			debug_string("tick location",$i);
+d55 1
+a55 1
+				debug_string("no tick location ");
+d62 1
+a62 1
+			debug_string("space location",$j);
+d64 1
+a64 1
+			debug_string("key len",$len);
+d66 1
+a66 1
+			debug_string("key",$key);
+d72 1
+a72 1
+			debug_string("value",$value);
+d76 1
+a76 1
+			debug_string("search",$search);
+d80 1
+a80 1
+    debug_string("done with subst");
+d112 1
+a112 1
+    debug_string("getfile($fname)");
+d115 1
+a115 1
+debug_string("open worked");
+d118 1
+a118 1
+debug_string("read worked");
+d125 4
+d137 4
+d147 1
+a147 1
+ * added $Id: htmlfuncs.php,v 1.4 2005/06/20 14:36:56 dave Exp $ in version function
+@
+
+
+1.4
+log
+@*** empty log message ***
+@
+text
+@d3 1
+a3 1
+	return "$Id: htmlfuncs.php,v 1.3 2005/03/01 17:38:15 dave Exp $";
+d29 13
+d43 40
+d94 26
+d122 3
+d130 3
+d136 1
+a136 1
+ * added $Id: htmlfuncs.php,v 1.3 2005/03/01 17:38:15 dave Exp $ in version function
+@
+
+
+1.3
+log
+@blank last line can cause problems (?)
+@
+text
+@d3 1
+a3 1
+	return "$Id: htmlfuncs.php,v 1.2 2005/02/07 18:39:31 dave Exp $";
+d43 3
+d47 5
+a51 2
+ * added $Log: htmlfuncs.php,v $ at end of file
+ * added $Id: htmlfuncs.php,v 1.2 2005/02/07 18:39:31 dave Exp $ in version function
+@
+
+
+1.2
+log
+@added $Log$ at end of file
+added $Id$ in version function
+@
+text
+@d3 1
+a3 1
+	return "$Id$";
+d42 5
+a46 1
+ * $Log$
+a48 1
+
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d2 3
+d8 1
+a8 1
+$header = <<<EOF
+a32 6
+
+	     <hr >
+	     <hr ><hr >
+
+
+
+d34 1
+a34 1
+	     <p><font size=-2>Version $version. Last changed on $lastmodified.</font>
+d41 3
+@

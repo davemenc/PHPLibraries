@@ -1,0 +1,1519 @@
+head	1.11;
+access;
+symbols;
+locks;
+comment	@# @;
+
+
+1.11
+date	2007.05.11.15.52.12;	author dmenconi;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2007.05.08.21.28.05;	author dmenconi;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2007.04.13.07.02.32;	author dmenconi;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2007.03.19.08.24.26;	author dmenconi;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2007.03.10.16.31.39;	author dmenconi;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.02.06.06.06.46;	author dmenconi;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2005.06.20.14.45.11;	author dave;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2005.06.20.14.36.56;	author dave;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2005.02.19.23.40.09;	author dave;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2005.02.07.18.39.31;	author dave;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2005.01.27.06.01.10;	author dave;	state Exp;
+branches;
+next	;
+
+
+desc
+@generally useful functions.
+@
+
+
+1.11
+log
+@added license information
+@
+text
+@<?php
+ /*
+  	Copyright 2007 Dave Menconi
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+/* $Id: miscfunc.php,v 1.9 2007/04/13 07:02:32 dmenconi Exp $ */
+/**
+ * miscfunc.php is a collection of routines 
+ * 
+ * These routines fall into a variety of categories
+ * from redirecting control to another html page to get stuff out
+ * of the whatchamall database. 
+ * In some cases we might expect that these routines will be moved into
+ * more specific files later but generally, they are here to stay. 
+ * @@author Dave Menconi 
+ * @@copyright Copyright &copy; 2005,2007 Dave Menconi
+ */
+include_once "../library/loc_login.php";
+include_once "../library/mysql.php";
+
+/**
+ *  JumpTo redirects to the specified URL and then stops
+ * 
+ * Jumpto uses either the PHP header command or the javascript jump command 
+ * this is the only place in all of whatchamall that we use javascript and, pratically,
+ * it will only be invoked if we've already written the headers. This probably means
+ * (absent a bug) that we have some debugging code in there. 
+ * $myurl is the place it's going to jump. if it isn't set, we'll jump to index.php
+ * @@param string $myurl
+ * @@author Dave Menconi 
+ * @@copyright Copyright &copy; 2005,2007 Dave Menconi
+ */
+function JumpTo($myurl="index.php"){
+	header("Location $myurl") or jscriptJumpTo($myurl);
+	exit();
+}
+/**
+ * this function uses java script to redirect if the header("Location: xx") fails.
+ * 
+ * This is the java script way to jump and we don't really want to use it. However
+ * if we've already sent the headers this is the only way to redirect. 
+ * 
+ * This should never be called directly! Always call JumpTO and let it call this one if it needs. 
+ * @@param string $myurl
+ * @@author Dave Menconi 
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+//this function uses java script to redirect if the header("Location: xx") fails.
+function jscriptJumpTo($myurl="index.php") {
+//	print jscriptJumpTo($myurl);
+echo <<<EOF
+<HTML><HEAD><TITLE>Redirecting..</TITLE></HEAD><BODY>
+<script>
+<!--
+document.location="$myurl";
+//-->
+</script>
+</BODY></HTML>
+EOF;
+exit();
+}
+/**
+ * Filters the standard RCS version string and removes various things from it so it's suitable for display 
+ * 
+ * @@param string $$rcsversion string from RCS
+ * @@return  datatype  string with stuff we don't want removed
+ * @@author Dave Menconi <dave@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function FilterVersion($rcsversion,$version=""){
+	$rcsversion = str_replace("$","",$rcsversion);
+    $rcsversion = substr($rcsversion,strpos($rcsversion,",v")+2);
+    $localversion = $version . "<br>RCSversion: " . $rcsversion;
+	return $localversion;		 
+}
+/**
+ * Removes all tags and other undesirable characters
+ * 
+ * 
+ * This routine removes all tags and special characters and
+ * trims all th strings
+ * @@param array $ar an array of strings
+ * @@return array the string it was passed but cleaned up
+ * @@author Dave Menconi 
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function BrickWall($ar){
+	if (!isset($ar)|| count($ar)<1)return $ar;
+	foreach($ar as $key=>$value){
+		$ar[$key]=strip_tags($value);
+		$ar[$key]=trim($value);
+	}
+	$remove = array(
+		"<script>",
+		"</script>",
+		chr(0)."..".chr(31),
+		chr(127)."..".chr(255)
+	);
+	$ar = str_replace ( $remove, "",$ar);
+	return $ar;
+}
+/**
+ * Logs statistics about system usage
+ * 
+ * Actually pretty simple; it just takes a bunch of data from $_SERVER and dumps it to a database
+ * needs the $PARAM array so that it can get the paramters and the $link so it can access the database.
+ * @@@@param  array  $PARAMS we need this to include the parameters from get or post
+ * @@@@param resource $link this is the resource that connects to the database
+ * @@@@author Dave Menconi 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function LogStats($link,$event,$eventtype="Entry"){
+	if(is_array($event)){
+		$newevent="";
+		foreach($event as $key=>$value){
+			$newevent .= "&".  $key.  "=".  $value;
+		}
+		$event=$newevent;
+	}
+	$user=loc_get_username();
+
+	$insert="insert into guesslog (referer , remote_addr , http_user_agent ,username ,request_uri ,eventtype,event) values ('".$_SERVER['HTTP_REFERER']."','".$_SERVER['REMOTE_ADDR']."','".$_SERVER['HTTP_USER_AGENT']."','".$user."','".$_SERVER['REQUEST_URI']."','".$eventtype."','".$event."')";
+	$result = mysql_query($insert,$link);
+}
+/* 
+ * $Log: miscfunc.php,v $
+ * Revision 1.9  2007/04/13 07:02:32  dmenconi
+ * added addrecord, parseaddrecord, editrecord, parseeditrecord
+ *
+ * Revision 1.8  2007/03/19 08:24:26  dmenconi
+ * added a bunch of date routines
+ *
+ * Revision 1.7  2007/03/10 16:31:39  dmenconi
+ * added new function to log data
+ *
+ * Revision 1.2  2007/02/24 21:03:58  dave
+ * added a log function and spiffed it up a bit, tested it, etc.
+ *
+ * Revision 1.1  2007/02/24 18:32:22  dave
+ * Initial revision
+ *
+ * Revision 1.6  2007/02/06 06:06:46  dmenconi
+ * safety
+ *
+ */
+@
+
+
+1.10
+log
+@added a display data function
+@
+text
+@a86 94
+function tomonthword($monthno,$len=0){
+	$monthno--;
+	$monthwords = array("January",
+"February", "March", "April","May","June", "July","August", "September","October", "November","December");
+	if ($len!=0){
+		return substr($monthwords[$monthno],0,$len);	
+	}
+	return $monthwords[$monthno];
+}	
+/**
+ * parses a date into it's components 
+ * 
+ * Takes a timestamp format and converts it into an array. Intended for 
+ * dates from a mysql call. 
+ * @@param string $datestr
+ * @@return  datatype  array of string components: year, mon, mday, hours, minutes, seconds
+ * @@author Dave Menconi 
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function parse_tsdate($datestr){
+//20070317120012
+	$datearray['year']=substr($datestr,0,4);
+	$datearray['month']=substr($datestr,4,2);
+	$datearray['mday']=substr($datestr,6,2);
+	$datearray['hours']=substr($datestr,8,2);
+	$datearray['minutes']=substr($datestr,10,2);
+	$datearray['seconds']=substr($datestr,12,2);
+	//debug_array("datearray",$datearray);
+	return $datearray;
+}
+function parse_dbdate($datestr){
+//2007-03-17
+	$datearray['year']=substr($datestr,0,4);
+	$datearray['month']=substr($datestr,5,2);
+	$datearray['mday']=substr($datestr,8,2);
+	return $datearray;
+}
+function parse_usdate($datestr){
+//03/17/2007
+	//debug_string("parse_usdate($datestr)");
+	$datearray['month']=substr($datestr,0,2);
+	$datearray['mday']=substr($datestr,3,2);
+	$datearray['year']=substr($datestr,6,4);
+	return $datearray;
+}
+
+function smart_parse_date($datestr){
+//	debug_string(" smart_parse_date($datestr)");
+	if (strpos($datestr,"-")>0){
+		$datearray = parse_dbdate($datestr);
+	}else if (strpos($datestr,"\\")>0){
+		$datearray = parse_tsdate($datestr); 
+	}else{
+		 $datearray = parse_tsdate($datestr); 
+	}
+	return $datearray;
+}
+function datearray_to_epoch($datearray){
+    $result = mktime(12,00,00,$datearray[month],$datearray[mday],$datearray[year]);
+	return $result;
+}
+/**
+ * Converts date array format to a time stamp
+ * 
+ * used with parse_date to get things back into the date format
+ * see parse_date for the format of the array
+ * @@param array $datearray
+ * @@return  string  in mktime format
+ * @@author Dave Menconi 
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function datearray_to_tstamp($datearray){
+	$tstamp = mktime($datearray['hours'],$datearray['minutes'],$datearray['seconds'],$datearray['month'],$datearray['mday'],$datearray['year']);
+	return $tstamp;
+}
+/**
+ *  converts a datestring to a standard US date
+ * 
+ * this takes a date string and turns it into M/D/Y format
+ * @@param string $datestr
+ * @@return  string  m/d/y date format
+ * @@author Dave Menconi 
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function std_date($datestr){
+	if (strpos($datestr,"-")===false) $datearray = parse_tsdate($datestr);
+	else $datearray = parse_dbdate($datestr);
+	//debug_array("datearray",$datearray);
+	$tstamp = datearray_to_tstamp($datearray);
+	//debug_string("tstamp",$tstamp);
+	$std_date = date("n/j/Y",$tstamp);
+	//debug_string("std_date",$std_date);
+	return($std_date);
+}
+a135 395
+/**
+ * Creates an array of epoch-formatted dates between two dates
+ * 
+ * Given two dates in m/d/y format, returns a list of dates (in epoch format) that are between them
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function CreateDateInterval($startdate,$enddate){
+	$sepoch = StrToEpoch($startdate);
+	$eepoch = StrToEpoch($enddate);
+	for ($t=$sepoch; $t<=$eepoch;$t+=86400){
+		$result[]=$t;
+	}
+	return $result;
+}
+/**
+ * Converts from a string to an epoch
+ * 
+ * This is actually kind of hard. For some cases (to wit, m/d/y and d/m/y style dates) this will convert from a string
+ * to an epoch. You can set the delim (meaning you can do m-d-y and d-m-y styles) and you can set whether it's U.S.
+ * style (m/d/y) or european style (d/m/y). 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function StrToEpoch($date,$delim="/",$usorder=true){
+//	debug_string("StrToEpoch($date,$delim)");
+//if($usorder)debug_string ("usorder");
+//else debug_string ("euro order");
+	//$daypos=$strpos($date,$delimI/
+	$elements = explode ( $delim, $date );
+	//debug_string("date",$date);
+	//debug_array("elements",$elements);
+	if ($usorder)$day = $elements[1];
+	else $day = $elements[0];
+	if ($usorder)$month = $elements[0];
+	else $month = $elements[1];
+	$year = $elements[2];
+	if (strlen($year)<4){// 2 digit year
+		if($year<70)$year+=2000;
+		else $year+=1900;
+	}	
+	$result = mktime(12,00,00,$month,$day,$year);
+	//debug_string("result",$result);
+	//debug_string("result date",strftime('%c',$result));
+	return $result;
+}
+/** 
+ * 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function ParseAddRecord($link,$tablename,$params){
+	//debug_string("ParseAddRecord($tablename)");
+	//debug_array("params",$params);
+	$valuelist = "";
+	$fieldlist = "";
+	$first = true;
+	foreach($params as $name=>$value){ 
+		if($name=="mode")continue;//skip mode param
+		if (!$first){
+			$valuelist.=",";
+			$fieldlist.=",";
+		} else {
+			$first =false;
+		}
+		$valuelist .= "'".$value."'";
+		$fieldlist .= $name;
+	}//foreach
+	//debug_string ("valuelist",$valuelist);
+	//debug_string ("fieldlist",$fieldlist);
+	$sql = "insert $tablename ($fieldlist) values ($valuelist)";
+	//debug_string("insertsql",$sql);
+	mysql_insert($link,$sql,true);
+}//function Parse...
+
+/** 
+ * 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function AddRecord($link,$tablename,$datanames,$mode){
+	$fieldnames = array_keys($datanames);
+	$result .= "<center><h2>Add Record</h2></center>\n";
+	$result .= " <FORM action=\"index.php\" method=\"post\">\n";
+	$result .= " <input type=\"hidden\" name=\"mode\" value=\"$mode\">\n";
+	$result .= " <input type=\"submit\" value=\"Add\">\n";
+	$result .= " <table border=0>\n";
+
+	foreach($datanames as $name=>$title){ 
+			$result .= " <tr><td><b>$title</b></td><td> <input type=\"text\" name=\"$name\" size=\"50\"></td></tr>\n";
+	}// foreach
+	$result .= " </table>\n";
+	$result .= " <input type=\"submit\" value=\"Add\">\n";
+	$result .= " </form>\n";
+	return $result;
+}
+
+
+/** 
+ * 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function ParseEditRecord($link,$tablename,$idname,$params){
+//	debug_string("ParseEditRecord($tablename,$idname)");
+	$valuelist = "";
+	$first = true;
+	foreach($params as $name=>$value){ 
+		if($name=="mode")continue;//skip mode param
+		if($name==$idname){
+			$recordid=$value;
+			continue;
+		}//if
+		if (!$first) $valuelist.=",";
+		else $first =false;
+		$valuelist .= $name."='".$value."'";
+	}//foreach
+	$sql = "update $tablename set $valuelist where $idname='$recordid'";
+	mysql_update($link,$sql,true);
+}//function Parse...
+
+/** 
+ * 
+ * @@@@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function EditRecord($link,$tablename,$idname,$recordid,$datanames,$mode){
+	$fieldnames = array_keys($datanames);
+	$record = MYSQLComplexSelect($link,$fieldnames,array($tablename),array($idname."='".$recordid."' "),array(),0);
+	$record = $record[0];
+	$result .= "<center><h2>Edit Record</h2></center>\n";
+	$result .= " <FORM action=\"index.php\" method=\"post\">\n";
+	$result .= " <input type=\"hidden\" name=\"mode\" value=\"$mode\">\n";
+	$result .= " <input type=\"hidden\" name=\"$idname\" value=\"$recordid\">\n";
+	$result .= " <input type=\"submit\" value=\"Update\">\n";
+	$result .= " <table border=0>\n";
+
+	foreach($record as $name=>$default){ 
+		$title = $datanames[$name];
+		$size = strlen($default)*2;
+		if ($size<10)$size = 10;
+		if ($size<50){
+			$result .= " <tr><td><b>$title</b></td><td> <input type=\"text\" name=\"$name\" value=\"$default\" size=\"$size\"></td></tr>\n";
+		} else {
+			$result .= " <tr><td valign=top><b>$title&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</b></td><td> <textarea name=\"$name\" rows=\"8\" cols=\"80\">$default</textarea></td></tr>\n";
+		}//else
+	}// foreach
+	$result .= " </table>\n";
+	$result .= " <input type=\"submit\" value=\"Update\">\n";
+	$result .= " </form>\n";
+	return $result;
+}
+
+
+function Listdata($link,$fieldinfo,$PARAMS,$usertype="active",$PageLengths=""){
+	//================= Define Some Constant Tables ======================
+	// define table headings and field names
+	$fieldinfo[] = array("title"=>"Name","field"=>"gamesname");
+	$fieldinfo[] = array("title"=>"Type","field"=>"type");
+	$fieldinfo[] = array("title"=>"Subject","field"=>"Subject");
+	$fieldinfo[] = array("title"=>"Effort","field"=>"effort");
+	$fieldinfo[] = array("title"=>"Status","field"=>"status");
+	$fieldinfo[] = array("title"=>"Best Players","field"=>"bestplayers");
+	$fieldinfo[] = array("title"=>"Min Players","field"=>"minplayers");
+	$fieldinfo[] = array("title"=>"Max Players","field"=>"maxplayers");
+	$fieldinfo[] = array("title"=>"Owner","field"=>"owner");
+	if ($PageLengths=="")$PageLengths = array(25,50,75,100,200,300);
+	$listkeywords = array("First","Page","Sort","Filter");
+	$listdefaults = array("0",    "25",  "0",   "0");
+	//================= get the basic list parameters =======================
+	for($i=0;$i<count($listkeywords);$i++){
+		$keyword = $listkeywords[$i];
+		if(isset($PARAMS[$keyword])) {
+			$listparams[$keyword]=$PARAMS[$keyword];
+		}
+		else if(isset($_COOKIE['GaListParams'])){
+			$listparams[$keyword]=$_COOKIE['GaListParams'][$i];
+		}else{
+			$listparams[$keyword]=$listdefaults[$i];
+		}
+		setcookie('GaListParams['.$i.']',$listparams[$keyword],0);
+	}
+		//debug_string("sort result",$listparams['Sort']);
+		
+	// get the list of types
+
+	//================= Get Data From Database =======================
+	//debug_string("typeno",$typeno);
+	$typeno=$listparams['Filter'];
+	$sortfield = $fieldinfo[$listparams['Sort']]['field'];
+	//$sortfield = $fieldinfo[$PARAMS['Sort']]['field'];
+	//debug_string("sortfield",$sortfield);
+
+	if ($typeno!=0) $filterclause[] = "typeno='".$typeno."'";
+	else {
+		$filterclause[]="typename!='Hide'";
+		$filterclause[]="typename!='Recruiter'";
+		$filterclause[]="typename!='Dup'";
+		$filterclause[]="typename!='Raw'";
+	}
+	$filterclause[] = "typeno=typeid";
+	//debug_array("filterclause",$filterclause);
+//debug_string("sortfield",$sortfield	);
+	if (!isset($sortfield)) $sortclause = "name";// limit 20";
+	else $sortclause = $sortfield ;//. " limit 20";
+	//debug_string("sortclause",$sortclause);
+ 	
+	$companies = MYSQLComplexSelect($link, array("*"),array("games"),array(),array($sortclause),0);
+	$companycount = count($companies)-1;
+	//debug_string("companycount",$companycount);
+
+	$alphamenu = alphalist($companies);
+	//================= Calculate paging information ======================
+	// $end -- we're at the end of the file, there is no next
+	// $start -- we're at the start of the file, there is no start
+	// $pagelen -- how many line show on a page
+	// $firstline -- the first line to show on the page
+	// $lastline -- the last line to show on the page
+	// $prevline -- if the user clicks on "previous", what's the first line going to be?
+	// $nextline -- if the user clicks on "next" what's the first line going to be?
+	// $pagelist -- array of line starts and ends for page menu
+	// $pagemenu -- actual page menu in HTML
+	// $startline -- first line of the firt page
+	// $endline -- first line of thelast page
+
+	$firstline = $listparams['First'];
+	$pagelen = $listparams['Page'];
+	$end = false;
+	$start = false;
+	if ($pagelen<=25) $pagelen=25;
+	if ($firstline<0) $firstline=0;
+	if ($pagelen>$companycount) $pagelen=$companycount;
+	$lastline = $firstline+$pagelen-1;
+	if ($lastline>$companycount) $lastline=$companycount;
+	if ($lastline >= $companycount-$pagelen)$end=true;
+	if ($firstline == 0) $start = true;
+
+	//debug_string("pagelen",$pagelen);
+	//debug_string("firstline",$firstline);
+	//debug_string("lastline",$lastline)+1;
+//if($start)debug_string("start=true");
+//if($end)debug_string("end=true");
+
+	$prevline = $firstline-$pagelen;
+	if ($prevline<0) $prevline=0;
+	$nextline = $firstline+$pagelen;
+	if ($nextline>$companycount)$nextline=$companycount;
+	$endline = $companycount-$pagelen+1;
+	$startline = 0;
+
+	$previousparams = "First=$prevline";
+	$firstparams = "First=$startline";
+	if (!$start){
+		$prevhtml = "<a href=\"index.php?".$previousparams."\">Previous</a>";
+		$firsthtml = "<a href=\"index.php?".$firstparams."\">First</a>";
+	} else {
+		$prevhtml = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+		$firsthtml = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+	}
+	$nextparams = "First=$nextline";
+	$lastparams = "First=$endline";
+	if (!$end) {
+		$nexthtml = "<a href=\"index.php?".$nextparams."\">Next</a>";
+		$lasthtml = "<a href=\"index.php?".$lastparams."\">Last</a><br>";
+	} else {
+		$nexthtml = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;";
+		$lasthtml = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>";
+	}
+
+	// page menu calculations
+	$totalpages = intval($companycount/$pagelen)+1;
+	$p=1;
+	//$pagemenu ="Pages: ";
+	$pagemenu = "";
+	//debug_string("firstline",$firstline);
+	for($l=0;$l<$companycount;$l+=$pagelen){
+		$pagelist[$p]['start'] = $l;
+		$pagelist[$p]['end']= $l+$pagelen-1;
+		if($firstline>=$l && $firstline<=$l+$pagelen-1){
+			$currentpage=$p;
+			$pagemenu .= " $p ";
+		}else{
+			$pagemenu .= " <a href=\"index.php?First=$l\">$p</a> ";
+		}
+		$p++;
+	}
+	//debug_string("currentpage",$currentpage);
+	//debug_string("<hr>pagemenu",$pagemenu."<hr>");
+	//debug_string("totalpages",$totalpages);
+	//debug_string("p",$p);
+	//debug_string("l",$l);
+	//debug_array("pagelist",$pagelist);
+
+//debug_string("firstline",$firstline);
+//debug_string("lastline",$lastline);
+//debug_string("prevline",$prevline);
+//debug_string("nextline",$nextline);
+//debug_string("startline",$startline);
+//debug_string("endline",$endline);
+	//debug_array("companies",$companies);
+	//debug_string("company count",$companycount);
+	
+	$types = MYSQLComplexSelect($link,array("*"),array("type"),array(),array("typeid desc"),0);
+	//debug_array("types",$types);
+	//debug_string("type count",$typecount);
+	
+	//======================== Draw Screen ===========================
+	Display_Generic_Header("Board Game  List","#FFe0FF");
+	//WriteBody($firstline,$lastline);
+
+	$self=$_SERVER['PHP_SELF'];
+//create filter pulldown menu
+	$filteroption = "&nbsp;&nbsp;<b>Filter by:</b> <select name=\"Filter\"><option value=\"0\">All";
+	for ($i=0;$i<count($types);$i++){
+		$optionname = $types[$i]['typename'];
+		$optionvalue = $types[$i]['typeid'];
+		$filteroption .= "<option value=\"".$optionvalue."\">".$optionname;
+	}
+	$filteroption .= '</select>';
+ $filteroption .= '<input type="hidden" name="First" value="0">';
+
+//create sort pulldown menu
+	//	debug_string("<hr>filteroption",$filteroption);
+	$sortoption = "&nbsp;&nbsp;<b>Sort by:</b> <select name=\"Sort\">";
+	for ($i=0;$i<count($fieldinfo);$i++){
+		$sortoption .= "<option value=\"".$i."\">" . $fieldinfo[$i]['title'];
+	}
+	$sortoption .= '</select>';
+	$headings = "";
+	for ($i=0;$i<count($fieldinfo);$i++){
+		$headings .= "<td><center><b><a href=\"index.php?Sort=" . $i . "\">" . $fieldinfo[$i]['title'] . "</b></font></a></td>";
+	}
+//create page length pulldown menu
+	$pageoption =  "&nbsp;&nbsp;<b>Page Size:</b> <select name=\"Page\">";
+	for ($i=0;$i<count($PageLengths);$i++){
+		$pageoption .= "<option value=\"" . $PageLengths[$i] . "\">" . $PageLengths[$i];
+	}
+	$pageoption .= '</select>';
+	
+	//$usertype = loc_get_usertype($link,$appcookie);	
+	$usermayedit =  ($usertype=="admin" || $usertype=="active");
+	// create company list html
+	$colist = "";
+	for($i=$firstline;$i<=$lastline;$i++){
+		// modify the company information before we try to output it (hey, that's cheating!)
+		$companies[$i]['rawname'] = $companies[$i]['gamesname'];
+		$companies[$i]['gamesname'] = "</center><a href=\"index.php?mode=detail&gameno=" . $companies[$i]['gameid'] . "\">" . $companies[$i]['gamesname']. "</a> <a href=\"index.php?mode=edit&gameno=" . $companies[$i]['gameid'] . "\">";
+		if ($usermayedit)$companies[$i]['gamesname'] .= "<font size=-2><i>Edit</font></i></a>";
+		$companies[$i]['gamesname'] .= "</i></a>";
+		if (isset($companies[$i]['description'])){
+			$companies[$i]['description'] = substr($companies[$i]['description'],0,60);
+		} else {
+			$companies[$i]['description'] = "&nbsp";
+		}
+		// now step through the fields and output information
+		$colist .= "<tr>\n";
+		for($j=0;$j<count($fieldinfo);$j++){
+			if(!isset( $companies[$i][$fieldinfo[$j]['field']])){ 
+				$companies[$i][$fieldinfo[$j]['field']]="&nbsp;";
+			}
+			$colist .= "\t<td>" . $companies[$i][$fieldinfo[$j]['field']] . "&nbsp;</td>\n";
+		}
+		if($companies[$i]['typename']=="Raw"){
+			$colist .= "\t<td><a href=\"http://clusty.com/search?tb=firefox-1.0.3&query=".$companies[$i]['rawname']."\"><font size=-2><i>Web Search</i></font></a></td>";
+		}
+		$colist .= "</tr>\n\n";
+	}
+	//debug_string("<hr>",$colist);
+	//debug_string("<hr>");
+$menu = CreateMenu();
+echo <<< EOF
+$menu
+ <center><h1>Board Game List</h1></center>
+<center>
+<center><h2>Display Settings</h2></center>
+
+<center> <FORM action="index.php" method="get">
+ <input type="hidden" name="mode" value="list">
+$sortoption
+$filteroption
+$pageoption
+ <input type="submit" value="Display">
+ </form>
+</center>
+<center><font size=+2><b>Game List </b></font></center>
+<center><font size=+1> <i>($companycount lines)</i></font></h2></center>
+$alphamenu<br>
+$firsthtml &nbsp; &nbsp; &nbsp; &nbsp; $prevhtml &nbsp; &nbsp; $pagemenu &nbsp; &nbsp; $nexthtml&nbsp; &nbsp; &nbsp; &nbsp; $lasthtml
+
+<center><table border=1>
+	<tr>
+		$headings
+	</tr> 
+	$colist
+
+</table>
+</center>
+$firsthtml &nbsp; &nbsp; &nbsp; &nbsp; $prevhtml &nbsp; &nbsp; &nbsp; &nbsp; $nexthtml&nbsp; &nbsp; &nbsp; &nbsp; $lasthtml
+<br><br>
+EOF;
+}
+@
+
+
+1.9
+log
+@added addrecord, parseaddrecord, editrecord, parseeditrecord
+@
+text
+@d2 16
+a17 1
+/* $Id: miscfunc.php,v 1.8 2007/03/19 08:24:26 dmenconi Exp $ */
+d106 1
+a106 1
+function parse_date($datestr){
+d109 1
+a109 1
+	$datearray['mon']=substr($datestr,4,2);
+d117 1
+a117 1
+function parse_date2($datestr){
+d120 1
+a120 1
+	$datearray['mon']=substr($datestr,5,2);
+d124 1
+a124 1
+function parse_date3($datestr){
+d126 2
+a127 1
+	$datearray['mon']=substr($datestr,0,2);
+d130 1
+d136 1
+a136 1
+		$datearray = parse_date2($datestr);
+d138 1
+a138 1
+		$datearray = parse_date3($datestr); 
+d140 1
+a140 1
+		 $datearray = parse_date($datestr); 
+d143 4
+a146 1
+
+d159 1
+a159 1
+	$tstamp = mktime($datearray['hours'],$datearray['minutes'],$datearray['seconds'],$datearray['mon'],$datearray['mday'],$datearray['year']);
+d172 2
+a173 2
+	if (strpos($datestr,"-")===false) $datearray = parse_date($datestr);
+	else $datearray = parse_date2($datestr);
+d378 247
+d627 3
+@
+
+
+1.8
+log
+@added a bunch of date functions
+@
+text
+@d2 1
+a2 1
+/* $Id: miscfunc.php,v 1.7 2007/03/10 16:31:39 dmenconi Exp $ */
+d210 146
+d360 3
+@
+
+
+1.7
+log
+@added new function to log data
+@
+text
+@d2 1
+a2 1
+/* $Id: miscfunc.php,v 1.2 2007/02/24 21:03:58 dave Exp $ */
+d14 2
+a15 2
+include_once "loc_login.php";
+include_once "mysql.php";
+d72 9
+d92 1
+d102 26
+d152 2
+a153 1
+	$datearray = parse_date($datestr);
+d214 3
+@
+
+
+1.6
+log
+@safety
+@
+text
+@d2 1
+a2 1
+/* $Id: miscfunc.php,v 1.5 2005/06/20 14:45:11 dave Exp $ */
+d11 2
+a12 2
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+d14 3
+d26 2
+a27 2
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+d41 1
+a41 1
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+d79 1
+a79 1
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+d99 1
+a99 1
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+d112 1
+a112 1
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+d132 1
+a132 1
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+d150 25
+d176 10
+a185 1
+ * $Log$
+@
+
+
+1.5
+log
+@remerget from what
+added description comments to all the functions
+whole file format prevents diff
+@
+text
+@d2 1
+a2 1
+/* $Id: miscfunc.php,v 1.19 2005/06/08 22:03:26 dave Exp $ */
+d56 14
+a121 463
+ * Sets the space number into the cookie
+ * 
+ * @@global  string $spacecookiename
+ * @@param int $paceno
+ * @@return  string empty string
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Set_Space_No($spaceno){
+	global $spacecookiename;
+	//debug_string("Set_Space_No()");
+	if (isset($spaceno)){
+		setcookie($spacecookiename,$spaceno,0,"/");
+	}else{
+	}
+}
+/**
+ * Get the tenant's space number
+ * 
+ * We have the tenant number in the cookie. But what is his space number. This
+ * routine finds that out. If the tenant happens to be a snooping admin, it will
+ * always get the first space from among all the tenants. 
+ * 
+ * eventually we have to resolve the issue of WHICH space we're going to get. 
+ * for now it just gets the first one
+ * 
+ * note  that this function does no validation; it assumes that data from get_tenant_number is valid
+ * @@global  resource  $link
+ * @@return  int  the number of the space
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_Space_No(){
+	global $link,$spacecookiename;
+	//debug_string("Get_Space_No()");
+	// get the tenant number from the cookie
+	$tenantno = get_tenant_number();
+	$spaceno = $_COOKIE[$spacecookiename];
+	// check to see if this tenant owns this space; if not, unset the space value
+	if(!IsThisMySpace($tenantno,$spaceno)){ 
+		unset ($spaceno);
+	}
+	if (!isset($spaceno)){
+		if ($tenantno>0){//if not the admin
+	    	$spaces = MYSQLComplexSelect($link,array("SpaceID"),array("Space"),array("TenantNo='".$tenantno."'"));
+		}else{ // but if we ARE the admin...
+	    	$spaces = MYSQLComplexSelect($link,array("SpaceID"),array("Space"));//get them all
+		}
+		$spaceno = $spaces[0]['SpaceID'];
+		//Set_Space_No($spaceno);
+	}
+	return $spaceno;
+}
+function IsThisMySpace($tenantno,$spaceno){
+	global $link;
+	//debug_string("IsThisMySpace()");
+	if($tenantno==0) return true;
+	$spaces = MYSQLComplexSelect($link,array("SpaceID"),array("Space"),array("TenantNo='".$tenantno."'","SpaceID='".$spaceno."'"),array(),0);
+	if(count($spaces)>0){
+		return true;
+	} else{
+		return false;
+	}
+}
+/**
+ * Get a list of spaces
+ * 
+ * The idea behind this routine is to solve the problem of Get_Space_No() which is 
+ * that a single tenant can have multiple spaces. So you can call this routine and get a list
+ * of the spaces and show it in a list for the user to pick. 
+ * @@global  resource  $link
+ * @@return  array  this is a list of spaces with spaceID and SpaceName for this tenant
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_Space_List(){
+	global $link;
+	$tenantno = get_tenant_number();
+	return MYSQLGetList($link,"Space","SpaceID,SpaceName"," TenantNo='".$tenantno."'");
+}
+/**
+ * This gets the data from the policy table and puts it into an array
+ * 
+ * This is the moral equivelent of having a config array included from a file but it allows us 
+ * to edit it without changing code and it can be backed up with the database. 
+ * The policy array is simply an associative array with "PolicyName" as the index. Of course,
+ * you have to know the names to get the values but you can get them out of the policy edit
+ * page in admin.php (i.e. it's not in a php file it's on a web page).
+ * @@global  resource  $link
+ * @@return  array  the policy array: policyname, policy value
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_PolicyArray(){
+	global $link;
+	$data = MYSQLComplexSelect($link,array("PolicyName","PolicyValue"),array("Policy"),array(),array("PolicyName"),0);
+	foreach ($data as $datum){
+		$name=$datum['PolicyName'];
+		$policy[$name]=$datum['PolicyValue'];
+	}
+	return($policy);
+}
+/**
+ * Gets the maximum width of a image
+ * 
+ * For each image type, it pulls the maximum width out of the policy routine and returns it.
+ * @@global  array $policy
+ * @@param string $uploadtype the name of the type of image we're getting info on
+ * @@param int $wm is this a whatchamall image or a tenant image?
+ * @@return  int  the width
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_MaxWidth($uploadtype,$wm=0){
+	global $policy;
+	$max_width=111;
+
+	switch($uploadtype){
+		case "biglogo": //a big logo for the store or the mall
+			$max_width=$policy['image_max_big_logo_width'];	
+			break;
+		case "smalllogo": // a small logo
+			$max_width=$policy['image_max_small_logo_width'];
+			break;
+		case "itempix": // a large item image
+			$max_width=$policy['image_max_item_width'];
+			break;
+		case "itemtn": // item thumbnail (tn) image
+			$max_width=$policy['image_max_item_tn_width'];
+			break;
+		case "bkgrnd":// a background image
+			$max_width=$policy['image_max_bkgrnd_width'];
+			break;
+		case "theme":// a theme thumbnail
+			if(isset($policy['image_max_theme_width']))	$max_width=$policy['image_max_theme_width'];
+			else $max_width=300;
+			break;
+	}
+	return $max_width;
+}
+/**
+ * get the description of an image type
+ * 
+ * You pass in the type name and this returns what kind of thing it is
+ * @@param  string  $uploadtype  which image type are we talking about
+ * @@param  bool  $wm  is this a whatchamall or a tenant image
+ * @@return  string  the description of the type
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_UploadDesc($uploadtype,$wm=0){
+	$description="";
+	switch($uploadtype){
+		case "biglogo": //a big logo for the store or the mall
+			$description="Large Size Logo";	
+			break;
+		case "smalllogo": // a small logo
+			$description="Small Size Logo";	
+			break;
+		case "itempix": // a large item image
+			$description="Large Size Item Image";	
+			break;
+		case "itemtn": // item thumbnail (tn) image
+			$description="Thumbnail Size Item Image";	
+			break;
+		case "bkgrnd":// a background image
+			$description="Background Image";
+			break;
+		case "theme":// a theme thumbnail
+			$description="Theme Thumbnail Image";
+			break;
+	}
+	return $description;
+}
+/**
+ * Get the file name for this type of file
+ * 
+ * The concept of this is that every file will be given a unique filename constructed from its 
+ * file prefix (which is returned by this function) and the image number. Currently this isn't fully implemented.
+ * @@param  string  $uploadtype  which image type are we talking about
+ * @@param  bool  $wm  is this a whatchamall or a tenant image
+ * @@return  string  the filename prefix
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_FileName($uploadtype,$wm=0){
+	$fname="file";
+	switch($uploadtype){
+		case "biglogo": //a big logo for the store or the mall
+			$fname="logo";	
+			break;
+		case "smalllogo": // a small logo
+			$fname="slog";	
+			break;
+		case "itempix": // a large item image
+			$fname="item";	
+			break;
+		case "itemtn": // item thumbnail (tn) image
+			$fname="sitm";	
+			break;
+		case "bkgrnd":// a background image
+			$fname="bkgd";
+			break;
+		case "theme":// a theme thumbnail
+			$fname="them";
+			break;
+	}
+	return $fname;
+}
+/**
+ * given the typename, return the type number
+ * 
+ * You pass in the type name and this returns the type number
+ * @@param  string  $uploadtype  which image type are we talking about
+ * @@param  bool  $wm  is this a whatchamall or a tenant image
+ * @@return  int  the type number
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function ConvertTypeNameToNumber($uploadtype,$wm=0){
+	switch($uploadtype){
+		case "biglogo": //a big logo for the store or the mall
+			return 1;
+			break;
+		case "smalllogo": // a small logo
+			return 2;
+			break;
+		case "itempix": // a large item image
+			return 3;
+			break;
+		case "itemtn": // item thumbnail (tn) image
+			return 4;
+			break;
+		case "bkgrnd":// a background image
+			return 5;
+			break;
+		case "theme":// a theme thumbnail
+			return 6;
+			break;
+	}
+	return 0;
+}
+/**
+ * given the type number, return the name
+ * 
+ * You pass in the type number and this returns the type name
+ * @@param  int  $uploadtypenum  which image type are we talking about
+ * @@param  bool  $wm  is this a whatchamall or a tenant image
+ * @@return  string name of item
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function ConvertTypeNumberToName($uploadtypenum,$wm=0){
+	switch($uploadtypenum){
+		case 1:
+			return "biglogo"; //a big logo for the store or the mall
+			break;
+		case 2: 
+			return "smalllogo"; // a small logo
+			break;
+		case 3: 
+			return "itempix"; // a large item image
+			break;
+		case 4: 
+			return "itemtn"; // item thumbnail (tn) image
+			break;
+		case 5:
+			return "bkgrnd";// a background image
+			break;
+		case 6:// a theme thumbnail
+			return "theme";
+			break;
+	}
+	return "";
+}
+
+/**
+ * find the image number
+ * 
+ * Given the type of image and item number and the space number, what is the image number? 
+ * For some kinds of images (such as item pictures) we need the itemno. For some (such as store logos) we need
+ * the spaceno. 
+ * @@param  string  $uploadtype  which image type are we talking about
+ * @@param  int  $itemno  which item this is for
+ * @@param  int  $spaceno  which space this is for
+ * @@param  bool  $wm  is this a whatchamall or a tenant image
+ * @@return  int  the image number
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_ImageNo($uploadtype,$itemno,$spaceno,$wm=0){
+	global $link;
+	$uploadno = ConvertTypeNameToNumber($uploadtype);
+	$elementno= 0;
+	$table = "Image";
+	debug_string("Get_ImageNo");
+	debug_string("itemno",$itemno);
+	debug_string("spaceno",$spaceno);
+	switch($uploadtype){
+		case "biglogo": //a big logo for the store or the mall
+			$elementno = $spaceno;	
+			break;
+		case "smalllogo": // a small logo
+			$elementno = $spaceno;	
+			break;
+		case "itempix": // a large item image
+			$elementno = $itemno;	
+			break;
+		case "itemtn": // item thumbnail (tn) image
+			$elementno = $itemno;	
+			break;
+		case "bkgrnd": // a small logo
+			$table = "WMImage";
+			break;
+		case "theme":// a theme thumbnail
+			$elementno = $itemno;
+			$table = "WMImage";
+			break;
+	}
+	$select= "select ImageID from ".$table." where ImageType='".$uploadno."' and ElementNo='".$elementno."'";
+	debug_string ("get_ImageNo select",$select);
+	$result = mysql_query($select,$link) or die(mysql_error());
+	$data = mysql_fetch_array($result,MYSQL_NUM);
+	$numrows = mysql_num_rows($result);
+	if($numrows>0 && $uploadtype!="bkgrnd"){
+		debug_array("image num record",$data);
+		return $data[0];
+	}else {
+		$insert= "Insert ". $table . " set ImageType='".$uploadno."' , ElementNo='".$elementno."'";
+		$result = mysql_query($insert,$link) or die(mysql_error());
+		$ImageIdSelect="select LAST_INSERT_ID() as ImageID from ".$table;
+		$result = mysql_query($ImageIdSelect,$link) or die(mysql_error());
+		$data = mysql_fetch_array($result,MYSQL_NUM);
+		debug_string("LAST_INSERT_ID",$data[0]);
+		return $data[0];
+	}
+	return 0;
+}
+/**
+ * get the maximum height of an image type
+ * 
+ * Given the type, what is the maximum height of an image? 
+ * @@param  string  $uploadtype  which image type are we talking about
+ * @@param  bool  $wm  is this a whatchamall or a tenant image
+ * @@return  int  the maximum height
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_MaxHeight($uploadtype,$wm=0){
+	global $policy;
+	$max_width=111;
+	switch($uploadtype){
+		case "biglogo": //a big logo for the store or the mall
+			$max_height = $policy['image_max_big_logo_height'];
+			break;
+		case "smalllogo": // a small logo
+			$max_height = $policy['image_max_small_logo_height'];
+			break;
+		case "itempix": // a large item image
+			$max_height = $policy['image_max_item_height'];
+			break;
+		case "itemtn": // item thumbnail (tn) image
+			$max_height = $policy['image_max_item_tn_height'];
+			break;
+		case "bkgrnd":// a background image
+			$max_height = $policy['image_max_bkgrnd_height'];
+			break;
+		case "theme":// a theme thumbnail
+			$max_height = $policy['image_max_theme_height'];
+			break;
+	}
+	return $max_height;
+}
+/**
+ * get the image path of this image
+ * 
+ * You pass in the image number and it returns the path
+ * @@param  string  $uploadtype  which image type are we talking about
+ * @@param  bool  $wm  is this a whatchamall or a tenant image
+ * @@return  string  the path to this item
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_ImagePath($imageno,$wm=0){
+	global $link;
+	//debug_string("Get_ImagePath() imageno",$imageno);
+	if ($wm) $select= "select ImageURL from WMImage where ImageID='".$imageno."'";
+	else $select= "select ImageURL from Image where ImageID='".$imageno."'";
+	//debug_string ("get_ImageNo select",$select);
+	$result = mysql_query($select,$link) or die(mysql_error());
+	$data = mysql_fetch_array($result,MYSQL_NUM);
+	$imagepath=$data[0];
+	//debug_string("Image Path",$imagepath);
+	return $imagepath;
+}
+/**
+ * updates the smarty template information
+ * 
+ * The idea behind this is that it adds new data to the 
+ * smarty template that will be needed in a lot of places.
+ * This has not been very successful because it turns out there
+ * isn't much overlap, really. 
+ * Plus it has too many globals (subroutines of this kind shouldn't usually have any). 
+ * @@deprecated
+ * @@global  string  $dbhost
+ * @@global  string  $dbuser
+ * @@global  string  $dbpass
+ * @@global  string  $dbname
+ * @@global  resource $link
+ * @@param int $spaceno
+ * @@param pointer $templ
+ * @@return  pointer  smarty template
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function Get_SmartyTemplate($spaceno,&$templ){
+	global $dbhost,$dbuser,$dbpass,$dbname,$link;
+	//debug_string("Get_SmartyTemplate()");
+//	 	$link = make_mysql_connect($dbhost,$dbuser,$dbpass,$dbname);
+	$spaceinfo = MYSQLComplexSelect($link,$fieldnames=array("*"),$tablenames=array("Space"),$where=array("SpaceID='".$spaceno."'"));
+	$tenantno = $spaceinfo['TenantNo'];
+	$tenantinfo = MYSQLComplexSelect($link,$fieldnames=array("*"),$tablenames=array("TenantContact"),$where=array("TenantID='".$tenantno."'"));
+	$items=MYSQLComplexSelect($link,$fieldnames=array("*"),$tablenames=array("Item"),$where=array("SpaceNo='".$spaceno."'"));
+//	break_mysql_connect($link);
+
+	$templ->assign("spaceinfo",$spaceinfo[0]);
+	$templ->assign("tenantinfo",$tenantinfo[0]);
+	$templ->assign("items",$items);
+
+
+	//$flag=debug_on();
+	//debug_string("Get_SmartyTemplate()");
+	//debug_string("space",$paceno);
+	//debug_array("template",$templ);
+	//debug_set($flag);
+
+	return ($templ);
+}
+/**
+ * Logs statistics about system usage
+ * 
+ * Actually pretty simple; it just takes a bunch of data from $_SERVER and dumps it to a database
+ * needs the $PARAM array so that it can get the paramters and the $link so it can access the database.
+ * @@param  array  $PARAMS we need this to include the parameters from get or post
+ * @@param resource $link this is the resource that connects to the database
+ * @@author Dave Menconi <whatchamall@@menconi.com>
+ * @@copyright Copyright &copy; 2005, Dave Menconi
+ */
+function LogStats($link,$PARAMS){
+		$paramstring="";
+	foreach($PARAMS as $key=>$value){
+		$paramstring .= "&".  $key.  "=".  $value;
+	}
+	//debug_string("paramstring",$paramstring);
+	//debug_string("LogStats()");
+	//debug_array("server",$_SERVER);
+	$user=get_username();
+	//debug_string("user",$user);
+	$insert="insert into SiteLog (referer , remote_addr , http_user_agent ,username ,request_uri ,params,logTS ) values ('".$_SERVER['HTTP_REFERER']."','".$_SERVER['REMOTE_ADDR']."','".$_SERVER['HTTP_USER_AGENT']."','".$user."','".$_SERVER['REQUEST_URI']."','".$paramstring."',null)";
+	//debug_string("insert",$insert);
+	$result = mysql_query($insert,$link) or die(mysql_error());
+}
+/**
+a146 16
+function ShowSmartyVariables($templ){
+	global $PARAMS;
+	if(isset($PARAMS['showvariables'])){
+		print "<hr><b><u>TEMPLATE VARIABLES</b></u> <br>";
+		$temp=$templ->_tpl_vars;
+		foreach ($temp as $key=>$array){
+			print $key." : "."<br>";
+			if (is_array($array)){
+				foreach($array[0] as $key=>$value){ 
+					print "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[".$key."]<br>";
+				}
+			}
+		}
+	}
+}
+	
+d148 1
+a148 58
+ * $Log: miscfunc.php,v $
+ * Revision 1.19  2005/06/08 22:03:26  dave
+ * changed status of various debug lines
+ *
+ * Revision 1.18  2005/05/24 20:42:51  dave
+ * fixed bug 250 "select to change space fails at random" by doing a jumpto after changing the space
+ *
+ * Revision 1.17  2005/05/05 09:02:15  dave
+ * removed some debug stuff
+ *
+ * Revision 1.16  2005/05/01 01:49:56  dave
+ * added bkgrnd and theme
+ *
+ * Revision 1.15  2005/04/20 18:48:02  dave
+ * added function ShowSmartyVariable()
+ *
+ * Revision 1.14  2005/04/16 20:59:23  dave
+ * Added a ton of comments
+ * added brickwall()
+ *
+ * Revision 1.13  2005/04/13 19:47:31  dave
+ * added a bunch of comments
+ *
+ * Revision 1.12  2005/04/12 06:39:37  dave
+ * added the ability to get images from the wmimage table
+ *
+ * Revision 1.11  2005/04/11 16:56:13  dave
+ * added new image type bkgrnd
+ *
+ * Revision 1.10  2005/04/06 01:11:10  dave
+ * added bkgrnd image type
+ *
+ * Revision 1.9  2005/03/31 07:10:54  dave
+ * added site logging
+ *
+ * Revision 1.8  2005/03/26 06:20:05  dave
+ * removed several debug statements
+ *
+ * Revision 1.7  2005/03/12 05:58:10  dave
+ * fixed itemno (was itemnum in some places)
+ * fixed spaceno (was SpaceID in some places)
+ * removed all debug stuff
+ *
+ * Revision 1.6  2005/03/10 04:26:32  dave
+ * added code to get the policy database
+ *
+ * Revision 1.5  2005/03/03 05:10:05  dave
+ * got catdetail mostly working
+ *
+ * Revision 1.4  2005/03/03 04:11:41  dave
+ * added category summary page
+ *
+ * Revision 1.3  2005/03/02 01:32:05  dave
+ * finished upload code
+ *
+ * Revision 1.2  2005/02/16 03:50:17  dave
+ * *** empty log message ***
+ *
+a149 1
+?>
+@
+
+
+1.4
+log
+@added exit() to JumpTo
+added GetRCSVersion
+@
+text
+@d2 24
+a25 6
+/* $Id: miscfunc.php,v 1.3 2005/02/19 23:40:09 dave Exp $ */
+//Miscelaneous functions
+// JumpTo redirects to the specified URL and then stops
+function Misc_Version(){
+	return "$Id: miscfunc.php,v 1.3 2005/02/19 23:40:09 dave Exp $";
+}
+d30 11
+a40 1
+
+d45 7
+a51 7
+	<HTML><HEAD><TITLE>Redirecting..</TITLE></HEAD><BODY>
+	<script>
+	<!--
+	document.location="$myurl";
+	//-->
+	</script>
+	</BODY></HTML>
+d53 1
+a53 1
+	exit();
+d55 10
+a64 1
+
+d75 10
+d89 9
+d107 563
+a669 17
+function Get_RCSVersion($rcs){
+	$result = str_replace("$","",$rcs);
+	$result = substr($result,strpos($result,",v")+2);
+	$result = "<br>RCSversion: " . $result;
+	return($result);
+}
+/*
+ * $Log: miscfunc.php,v c
+ * Revision 1.3  2005/02/19 23:40:09  dave
+ * upgraded with changes from what
+ *
+ * Revision 1.2  2005/02/07 18:39:31  dave
+ * added $Log: miscfunc.php,v $
+ * added Revision 1.3  2005/02/19 23:40:09  dave
+ * added upgraded with changes from what
+ * added at end of file
+ * added $Id: miscfunc.php,v 1.3 2005/02/19 23:40:09 dave Exp $ in version function
+@
+
+
+1.3
+log
+@upgraded with changes from what
+@
+text
+@d2 1
+a2 1
+/* $Id$ */
+d6 1
+a6 1
+	return "$Id: miscfunc.php,v 1.2 2005/02/07 18:39:31 dave Exp $";
+a12 1
+
+d51 6
+d58 4
+a61 1
+ * $Log: miscfunc.php,v $
+d63 5
+a67 2
+ * added $Log$ at end of file
+ * added $Id$ in version function
+@
+
+
+1.2
+log
+@added $Log$ at end of file
+added $Id$ in version function
+@
+text
+@d2 1
+d6 1
+a6 1
+	return "$Id$";
+d53 5
+a57 1
+ * $Log$
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d4 3
+d51 3
+a53 1
+	
+@

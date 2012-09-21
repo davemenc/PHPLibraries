@@ -1,0 +1,104 @@
+head	1.1;
+access;
+symbols;
+locks;
+comment	@# @;
+
+
+1.1
+date	2005.06.20.14.36.56;	author dave;	state Exp;
+branches;
+next	;
+
+
+desc
+@class that generates navigation tabs across the top of the screen
+requires a bunch of graphics to work correctly
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@<?
+/**
+* This class will generate simple tabs without requiring image rollovers.
+*
+* @@author    Peter Drinnan <pdrinnan_at_3da_dot_com>
+* @@copyright Peter Drinnan
+*
+*/
+
+
+/////////////////////////////////
+// Class SimpleTabs
+// This class will generate
+//
+////////////////////////////////
+class simpleTabs{
+
+	var $image_url = '/images';
+	var $items_array = array();
+
+
+	function simpleTabs($items_array, $image_url){
+
+		$this->items_array = $items_array;
+		$this->image_url = $image_url;
+
+	}
+
+
+	///////////////////////////////////
+	function ShowTabs($item){
+		$TabsHTML = $this->GenTabsHTML($item);
+		echo $TabsHTML;
+	}
+	function GenTabsHTML($item){
+
+		$tabshtml = "";
+		$tabshtml .= "<table border=0 cellpadding=0 cellspacing=0><tr>\n";
+
+		$tabshtml .= "<td background=\"$this->image_url/tab_basetop.gif\">&nbsp&nbsp;&nbsp&nbsp;<img src=\"$this->image_url/empty.gif\" width=1 height=1 border=0></td>\n";
+
+		foreach($this->items_array as $key => $val){
+
+			if($item == $key){ $tabkey = "fore"; }
+			else { $tabkey = "rear"; }
+
+			$tabshtml .= "<td valign=bottom>"
+			. "<table border=0 cellpadding=0 cellspacing=0>"
+			. "<tr>"
+			. "<td><IMG SRC=\"$this->image_url/" . $tabkey . "tab_left.gif\" WIDTH=\"8\" HEIGHT=\"34\" BORDER=\"0\" ALT=\"\"></td>"
+			. "<td background=\"$this->image_url/" . $tabkey . "tab_middle.gif\" valign=middle>";
+
+			if( file_exists(getenv("DOCUMENT_ROOT") . $this->image_url . "/" . strtolower($key) . "_mini.gif")){
+				$tabshtml .= "<a href=\"$val\"><img src=\"$this->image_url/" . strtolower($key) . "_mini.gif\" border=0></a>";
+			}
+
+			$tabshtml .= "</td>"
+			. "<td background=\"$this->image_url/" . $tabkey . "tab_middle.gif\" valign=middle>&nbsp;<b><a href=\"$val\"><font color=\"#FFFFFF\">" . str_replace("_","&nbsp;",$key) . "</font></a></b></td>"
+			. "<td><IMG SRC=\"$this->image_url/" . $tabkey . "tab_right.gif\" WIDTH=\"8\" HEIGHT=\"34\" BORDER=\"0\" ALT=\"\"></td>"
+			. "</tr>"
+			. "</table>"
+			. "</td>\n";
+
+		}
+
+		$tabshtml .= "<td width=100% background=\"$this->image_url/tab_basetop.gif\"><img src=\"$this->image_url/empty.gif\" width=1 height=1 border=0></td>\n";
+
+		$tabshtml .= "<tr>\n";
+		$tabshtml .= "<td colspan=" . (count($this->items_array)+2) . " background=\"$this->image_url/tab_base.gif\" HEIGHT=\"5\"><img src=\"$this->image_url/empty.gif\" width=1 height=1 border=0>";
+
+		$tabshtml .= "</tr></table>";
+
+	return $tabshtml;
+	}
+
+}
+
+
+?>
+@

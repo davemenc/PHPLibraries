@@ -1,0 +1,88 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2007.02.03.20.05.54;	author dmenconi;	state Exp;
+branches;
+next	;
+
+
+desc
+@remove this safely
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@<?php
+	include_once "../library/debug.php";
+	include_once "../library/miscfunc.php";
+function login_util_version(){
+	return "$Id: loginutil.php,v 1.2 2005/02/07 18:39:31 dave Exp $";
+}
+function check_auth_cookie($appcookie,$appword,$username=""){
+	//debug_string("check_auth_cookie()");
+	//debug_string("appcookie",$appcookie);
+	//debug_string("appword",$appword);
+	//debug_string("username",$username);
+	//debug_array("cookie",$_COOKIE);
+	//debug_array("server",$_SERVER);
+	if (!isset($_COOKIE[$appcookie])){
+		//debug_string("no cookie by that name");
+		return false;
+	}
+	$c_username = $_COOKIE[$appcookie][0];
+	if ($username==""){$username=$c_username;}
+	//debug_string("c_username",$c_username);
+	$c_time = $_COOKIE[$appcookie][1];
+	//debug_string("c_time",$c_time);
+	$c_hash = $_COOKIE[$appcookie][2];
+	//debug_string("c_hash",$c_hash);
+
+	$hash = md5($appword.$username.$c_time);
+	if(strcmp($c_username,$username)==0 && strcmp($hash,$c_hash)==0){
+		return true;
+	}else{
+		return false;
+	}
+}
+function get_cookie_name($appnum=0){
+	//debug_string("get_cookie_name()");
+	//debug_string("appnum",$appnum);
+	$cookie_name="ck_app" . (string)$appnum;
+	//debug_string("cookie_name",$cookie_name);
+	return $cookie_name;
+}
+
+function GetAuthenticated($appnum,$appword){
+	if (!isset($appnum) || !isset($appword)){
+		print "<h1>Error in Application!</h1>";
+		print "<P>The application number is not set in GetAuthenticated.  Please contact administrator.";
+		exit();
+	}
+	$appcookie = get_cookie_name($appnum);
+	if (check_auth_cookie($appcookie,$appword)){
+		return true;
+	}	
+	$return = "http://" . $_SERVER['HTTP_HOST'] . $_SERVER['PHP_SELF'] ;
+	//debug_string("return",$return);
+	$login_url = "http://67.113.154.163/login/login.php?application=" . $appnum . "&return=" . $return ;
+	//debug_string("login_url",$login_url);
+	JumpTo($login_url);
+}
+/*
+ * $Log: loginutil.php,v $
+ * Revision 1.2  2005/02/07 18:39:31  dave
+ * added $Log: loginutil.php,v $ at end of file
+ * added $Id: loginutil.php,v 1.2 2005/02/07 18:39:31 dave Exp $ in version function
+ *
+ */
+?>
+@

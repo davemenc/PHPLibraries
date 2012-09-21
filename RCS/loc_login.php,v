@@ -1,0 +1,1457 @@
+head	1.12;
+access;
+symbols;
+locks;
+comment	@# @;
+
+
+1.12
+date	2008.01.23.03.19.45;	author dmenconi;	state Exp;
+branches;
+next	1.11;
+
+1.11
+date	2007.12.03.01.10.04;	author dmenconi;	state Exp;
+branches;
+next	1.10;
+
+1.10
+date	2007.05.11.15.52.12;	author dmenconi;	state Exp;
+branches;
+next	1.9;
+
+1.9
+date	2007.03.10.16.29.39;	author dmenconi;	state Exp;
+branches;
+next	1.8;
+
+1.8
+date	2007.03.10.16.22.13;	author dmenconi;	state Exp;
+branches;
+next	1.7;
+
+1.7
+date	2007.02.08.08.39.08;	author dmenconi;	state Exp;
+branches;
+next	1.6;
+
+1.6
+date	2007.02.06.15.26.48;	author dmenconi;	state Exp;
+branches;
+next	1.5;
+
+1.5
+date	2007.02.06.06.05.05;	author dmenconi;	state Exp;
+branches;
+next	1.4;
+
+1.4
+date	2007.01.19.04.37.28;	author dmenconi;	state Exp;
+branches;
+next	1.3;
+
+1.3
+date	2005.12.12.07.46.48;	author dave;	state Exp;
+branches;
+next	1.2;
+
+1.2
+date	2005.12.12.07.37.46;	author dave;	state Exp;
+branches;
+next	1.1;
+
+1.1
+date	2005.11.22.03.30.59;	author dave;	state Exp;
+branches;
+next	;
+
+
+desc
+@local login code -- allows an application to manage it's own login
+this is distinct (and completely independent) from the system wide login
+@
+
+
+1.12
+log
+@added <table> to login page to fix display bug
+@
+text
+@<?PHP
+/* $Id: loc_login.php,v 1.11 2007/12/03 01:10:04 dmenconi Exp $ */
+
+ /*
+  	Copyright 2007 Dave Menconi
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+include_once "../library/debug.php";
+include_once "../library/mysql.php";
+include_once "../library/miscfunc.php";
+include_once "../library/htmlfuncs.php";
+//include_once "login.php";
+/***********************************
+ ********* FUNCTIONS **************
+ **********************************/
+//------------------------------------
+
+function loc_get_userno($link,$cookiename="login"){
+	global $usertable;
+    //debug_string("loc_get_userno()");
+    $username = loc_get_username($cookiename);
+	if (""==$username) return -1;
+	$user = MYSQLComplexSelect($link,array("*"),array($usertable),array("username='$username' limit 1"),array(),0);
+    if (0==count($user)){
+        return -1;
+    }
+	$userno = $user[0]['id'];
+	return $userno;
+}
+//------------------------------------
+//$link: live link to db
+//$cookiename: the cookie we're looking for
+// Gets the username out of the cookie 
+// looks it up in the database
+// returns type or -1 if there is no such user
+function loc_get_usertype($link,$cookiename="login"){//get the type of user
+	global $usertable;
+	//debug_string("loc_get_usertype()");
+    $username = loc_get_username($cookiename);
+	if (""==$username) return -1;
+	$user = MYSQLComplexSelect($link,array("*"),array($usertable),array("username='$username' limit 1"),array(),0);
+	if(count($user)<1) return -1;
+	$type = $user[0]['type'];
+    return $type;
+}
+
+//------------------------------------
+function loc_get_userlist($link){//get a list of users for a particular application
+	global $usertable;
+    //debug_string("loc_get_userlist()");
+	$users = MYSQLComplexSelect($link,array("*"),array($usertable),array(),array(),0);
+    return $users;
+}
+
+//------------------------------------
+function loc_display_activation_failed($title,$color){
+	global $version,$lastmodified;	
+	//debug_string("loc_display_activation_failed($title,$color)");
+	Display_Generic_Header($title . " Activation Failed",$color);
+	print "<h1>$title Activation Failed</h2>\n";
+
+	print "For some reason your activation failed. Please try the registration process again.<br> \n";
+	print "<center>  <a href=\"index.php\">Register on $title again.</a> </center>\n";
+    Display_Generic_Footer($version,date("F d Y H:i:s", getlastmod()));
+	exit();
+}
+//------------------------------------
+function loc_display_activation($title,$color){
+	global $version,$lastmodified;	
+	//debug_string("loc_display_activation($title,$color)");
+	Display_Generic_Header($title . " Activation",$color);
+	print "<h1>$title Activation</h2>\n";
+
+	print "You have successfully activated you $title account.<br> \n";
+	print "<center>  <a href=\"index.php\">Log in to $title </a> </center>\n";
+    Display_Generic_Footer($version,date("F d Y H:i:s", getlastmod()));
+	exit();
+}
+//------------------------------------
+function loc_activate($link,$PARAMS,$title,$color){
+	global $usertable;
+	//debug_string("loc_activate()");
+	$username = $PARAMS['username'];
+	$actword = $PARAMS['act'];	
+	
+	$user = MYSQLComplexSelect($link,array("*"),array($usertable),array("actword='$actword'","username='$username'"),array(),0);
+    if (0==count($user)){
+		// activation failed
+		loc_display_activation_failed($title,$color);
+		exit();
+	} 
+	$sql = "update $usertable set type='active' where username='$username'";
+    //$result = mysql_query($sql,$link) or die(mysql_error());
+	mysql_update($link,$sql,$die=true);
+	loc_display_activation($title,$color);
+	exit();
+}
+//------------------------------------
+// loc_display_login
+// $title: Title of login screen
+// $color: Background color of login screen
+// $mode: mode value to pass back through form to original application
+// $message: display this to explain why we're here (eg "bad password")
+// $loginapp: application that will process login info
+// $reg: display registration section? 
+// $PARAMS: values of last put or get
+
+function loc_display_login($title,$color,$mode,$message="",$loginapp="index.php",$reg=false,$PARAMS=""){
+	global $version,$lastmodified;	
+	//debug_string("loc_display_login()");
+	if ($PARAMS!=""){
+		if(isset($PARAMS['name'])) $name=$PARAMS['name'];
+		if(isset($PARAMS['email'])) $email=$PARAMS['email'];
+		if(isset($PARAMS['username'])) $username=$PARAMS['username'];
+		if(isset($PARAMS['password'])) $password=$PARAMS['password'];
+		if(isset($PARAMS['password2'])) $password2=$PARAMS['password2']; 
+	}
+	Display_Generic_Header($title . " Login",$color);
+	
+	echo <<< EOF
+	<center>|  <a href="index.php?mode=list">Return to $title </a> |</center>
+	<br><br>
+	<br><br>
+<center>
+<table >
+<tr>
+<td valign="top">
+
+	<font color=red size=+1>$message</font>
+	<br><br>
+	<h2>Enter Username & Password</h2>
+	<h3></h3>
+	<form method="post" action="$loginapp">
+	<table><tr><td><b>Username: </b></td> <td><input type="text" name="username" value="$username"><br></td></tr>
+	<tr><td><b>Password: </b></td><td>	<input type="password" name="password" ><br></td></tr>
+	</table>	<input type="submit"  value="Submit"><br>
+	<input type="hidden" name="mode" value="$mode">
+	</form>
+</td>
+<table>
+EOF;
+	if (!$reg){
+	} else {
+	echo <<< EOF2
+<td align="center">
+<b>|<br>|<br>|<br>|<br>|<br> &nbsp;&nbsp;&nbsp;&nbsp;- OR - &nbsp;&nbsp;&nbsp;&nbsp;<br>|<br>|<br>|<br>|<br>|<br></b>
+</td>
+<td>
+
+<center><h2>Register As New User</h2>
+<h3>It's Free!</h3>
+<!-- ' -->
+<b>All fields are required.</br>
+<b>
+<form method="post" action="index.php">
+<table >
+<tr><td><b>Your Real Name: </b></td><td>	<input type="text" name="name" value="$name"><br></td></tr>
+<tr><td><b>Email: </b></td><td>	<input type="text" name="email" value="$email"><br></td></tr>
+<tr><td><b>Username: </b></td> <td><input type="text" name="uname" value="$username"><br></td></tr>
+<tr><td><b>Password: </b></td><td>	<input type="password" name="userpass" ><br></td></tr>
+<tr><td><b>Confirm Password: </b></td><td>	<input type="password" name="password2"><br></td></tr>
+</table>	<input type="submit"  value="Submit"><br>
+<input type="hidden" name="mode" value="newuser">
+
+</form>
+<b>A message will be sent to your email with an activation URL. <br>Your new account will work only <i>after</i> you activate. </b>
+
+
+</td>
+</tr>
+</table>
+EOF2;
+	}
+    Display_Generic_Footer($version,date("F d Y H:i:s", getlastmod()));
+}
+//------------------------------------
+function loc_parse_newuser($link,$PARAMS){
+	global $usertable;
+	//debug_string("loc_parse_newuser()");
+	$name = $PARAMS['name'];
+	$email = $PARAMS['email'];
+	$username = $PARAMS['uname'];
+	$userpass = $PARAMS['userpass'];
+	$password2 = $PARAMS['password2'];
+	// confirm that all the fields are there
+	if ($username=="") return "You must enter a user name.";
+	if ($userpass=="") return "You must enter a password";
+	if($name=="") return "Your real name is required!";
+	if ($email=="") return "Your email address is required.";
+
+	// validate the fields
+	if ($userpass!=$password2) return "Password and Confirm Password Do Not Match. Please try again.";
+    $users = MYSQLComplexSelect($link,array("*"),array($usertable),array("username='".$username."'"),array(),0);
+	if (count($users)>0) return "Username already in use; please pick another.";
+
+	// add user to db
+	$actword = loc_GenerateRandomWord();
+	//$sql = "insert into $usertable (username,userpass,email,name,temppw,type,actword) values ('".$username."','".$userpass."','".$email."','".$name."','','inactive','".$actword."')";
+	$sql = "insert into $usertable (username,userpass,email,name,temppw,type,actword) values ('".$username."','".$userpass."','".$email."','".$name."','','active','".$actword."')";
+	mysql_insert($link,$sql,$die=true);
+    //$result = mysql_query($sql,$link) or die(mysql_error());
+
+// send email to user
+	$subject = "Activation Email";
+	$URL = $_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI']."?act=$actword&username=$username&mode=act";
+//debug_string("http_host",$_SERVER['HTTP_HOST']);
+//debug_string("URI",$_SERVER['REQUEST_URI']);
+	$message = "To activate your account for $username, please go to the following URL: $URL";
+//debug_string("subject",$subject);
+//debug_string("Url",$URL);
+//debug_string("message",$message);
+//debug_string("email",$email);
+	$success = mail($email, $subject, $message,"FROM:dave@@menconi.com" );
+// send email to admin
+	if (!$success) $status="failed";
+	else $status = "succeeded";
+//debug_string("status",$status);
+//mail("dave@@menconi.com","test mail from rabbit","This is the message, I hope it isn't too long","from: dave@@menconi.com");
+//mail("davemenc@@gmail.com","test mail from rabbit","This is the message, I hope it isn't too long");
+	mail("dave@@menconi.com,davemenc@@gmail.com","user registration","User $name ($username) tried to register. We tried to send an email to $email and it $status. $URL","FROM: dave@@menconi.com");
+
+	loc_display_newuseradded();
+	exit();
+}
+function loc_display_newuseradded(){
+	print "<h1>CONGRATULATIONS</h1>\n";
+	print "You have successfully registered. <br>\n";
+	print "Please look in your email for an activation message. Go to the URL in that message and you will automatically be activated. <br>\n";
+	print "Thank you for registering! <br>\n";
+	exit();
+}
+//------------------------------------
+function loc_create_auth_cookie($username, $appexpiry, $appword,$cookiename="login"){
+    // create a cookie from the information we have
+	//debug_string("loc_create_auth_cookie()");
+	if (!isset($username) || ""==$username) return;
+    $hashtime = time();
+	$cookexp = loc_calc_cookie_expiry($appexpiry,$hashtime);
+    $hash = md5($appword.$username.$hashtime.$cookexp);
+	loc_save_cookie_data($username,$hashtime,$hash,$cookexp,$cookiename);
+}//create_auth_cookie
+
+// $appword: code word to make hash unique
+// $cookexp: 
+// $cookiename: the name of the cookie of interest
+// $username: username we're looking for; if omitted we'll accept out of the cookie
+// returns 
+//------------------------------------
+function loc_check_auth_cookie($appword,$cookexp=0,$cookiename="login",$username=""){
+//debug_string("loc_check_auth_cookie()");
+
+	$c_data = loc_get_cookie_data($cookiename);// get the cookie data
+    if (!isset($c_data)){// if no data return false
+        return false;
+    }
+//parse out the data in the cookie
+	$c_username = $c_data['name'];// get the username
+    if (""==$username){$username=$c_username;}//use cookie username if none given
+	$c_time = $c_data['time'];
+	$c_hash = $c_data['hash'];
+	$c_expire = $c_data ['expire'];
+//check expiration time; delete cookie and return false if expired
+	if (0!=$c_expire && $c_expire<time()){
+		loc_delete_cookie($cookiename);
+		return false;
+	}
+//calc hash
+    $hash = md5($appword.$username.$c_time.$cookexp);// calculate hash 
+// check hash
+    if(strcmp($c_username,$username)==0 && strcmp($hash,$c_hash)==0 ){
+
+        return true;
+    }else{
+        return false;
+    }
+}
+//------------------------------------
+// loc_get_username
+// $cookiename: the name of the cookie
+// gets the user name from the cookie 
+// returns username or "" if there is no cookie
+//------------------------------------
+function loc_get_username($cookiename="login"){
+	//debug_string("loc_get_username()");
+	
+	$cdata = loc_get_cookie_data($cookiename);
+    if(isset($cdata['name'])){
+        return $cdata['name'];
+    }else{
+        return "";
+    }
+}
+//------------------------------------
+//loc_calc_cookie_expiry($expiry,$time){
+//------------------------------------
+function loc_calc_cookie_expiry($expiry,$time){
+//debug_string('loc_calc_cookie_expiry()');
+	if(0==$expiry)$cookexp=0;
+	else $cookexp=$time+$expiry;
+	return($cookexp);
+}
+//------------------------------------
+/******************************************
+loc_GetAuthenticated()
+$PARAMS params from _GET and _PUT 
+$link: a live link to the database
+$magic_word: 
+$cookiename: the name we should give the cookie
+$admin: does this login require an admin
+$title: 
+$color: Color of the background of the login screen
+$loginapp: name of login application
+$reg: should login include registration? 
+PARAMS: Mode=login or newuser
+
+*******************************************/
+function loc_GetAuthenticated($PARAMS,$link,$magic_word,$cookiename="login",$admin=false,$expiry=0,$title="Application",$color='#F0F0F0',$loginapp="index.php", $reg=false){
+	global $usertable;
+//debug_string(usertable,$usertable );
+	if (!isset($usertable))$usertable ="user";
+//debug_string(usertable,$usertable );
+    //check Cookie
+    //debug_string("---- loc_GetAuthenticated ----");
+//debug_array("loc_GetAut PARAM",$PARAMS);
+	$username = $PARAMS['username'];
+	$pass = $PARAMS['password'];
+	$mode = $PARAMS['mode'];
+	if($mode=="")$mode="login";
+	if($mode=="newuser"){	
+		$message = loc_parse_newuser($link,$PARAMS);
+		loc_display_login($title,$color, $mode,$message,$loginapp,$reg);
+		exit();
+	}
+	if($mode=="act"){
+		loc_activate($link,$PARAMS,$title,$color);
+	}	
+
+	$c_data = loc_get_cookie_data($cookiename);
+		//debug_string("get cookie");
+	$message = "";
+	// check for a valid cookie
+	if (loc_check_auth_cookie($magic_word,loc_calc_cookie_expiry($expiry,$c_data['time']),$cookiename)){
+		//debug_string("good cookie");
+		$type = loc_get_usertype($link,$cookiename);
+		$username = loc_get_username($cookiename);
+		if('inactive'==$type){//shouldn't have a cookie
+			loc_delete_cookie($cookiename);
+			loc_display_login($title,$color, $mode,$message="User in cookie is listed as inactive.",$loginapp,$reg);
+			exit();
+		} else if('admin'==$type){ // the user is the admin so it's good enough no matter what
+			loc_create_auth_cookie($username,$expiry,$magic_word,$cookiename);//reset cookie so it doesn't expire// how can there be a valid $type at this point? 
+		} else if((!$admin && 'active'==$type)|| 'admin'==$type){//we don't need an admin so any good cookie is good enough
+			loc_create_auth_cookie($username,$expiry,$magic_word,$cookiename);//reset cookie so it doesn't expire
+            return true;
+// no valid cookie, no valid type, 
+        } else { //it will get here if we've dropped the username out of the cookie or anyother case where get_username fails
+			loc_delete_cookie($cookiename);
+			loc_display_login($title,$color, $mode,$message="User in cookie has unknown type (cookie removed).",$loginapp,$reg);
+			exit();
+        }
+		return true;
+    } else {
+		loc_delete_cookie($cookiename);
+	}//if loc_check_auth
+    //at this point there isn't a valid cookie
+//debug_string("no valid cookie");
+    // check username/password
+    if(isset($username) && isset($pass)){//we have no cookie but we have a username and password
+//debug_string("have username and password",$username.":".$pass);
+//debug_string("doing mysql think");
+    	$users = MYSQLComplexSelect($link,array("*"),array($usertable),array("username='".$username."'"),array(),0);
+//debug_string ("done with mysql thing");
+		if (count($users)==0){//no such user
+			loc_display_login($title,$color,$mode,$message="Bad user/password combination.",$loginapp,$reg);
+			exit();
+		}
+		$user = $users[0];
+		$id =  $user['id'];        
+		$userpass =  $user['userpass'];  
+		$email =  $user['email'];     
+		$name =  $user['name'];      
+		$temppw =  $user['temppw'];    
+		$tpwexpiry =  $user['tpwexpiry']; 
+		$type =  $user['type'];      
+		$actword =  $user['actword'];   
+		$ts =  $user['ts'];    
+		$today = date("Y-m-d");
+		if (($pass==$userpass) or ($temppw==$userpass && $tpwexpiry>$today)) { // valid password 
+		
+		/*   
+TRUTH TABLE OF USER ACCESS CASES
+           $admin (need admin privs to succeed)
+$TYPE   |True|False|
+--------------------
+admin   | T  |  T  |
+--------------------
+active  | F  |  T  |
+--------------------
+inactive| F  |  F  |
+--------------------
+T means the login succeeds
+F means the login fails
+*/
+			if ('inactive'==$type) {//user inactive
+				loc_display_login($title,$color,$mode,$message="User is inactive. Activate user or login as different user.",$loginapp,$reg);
+				exit();
+			}
+			else if ($admin && 'active'==$type){  // action requires admin privs
+				loc_display_login($title,$color,$mode,$message="Action requires user to be admin.",$loginapp,$reg);
+				exit();
+			} else {// good to go!
+				loc_create_auth_cookie($username,$expiry,$magic_word,$cookiename);//reset cookie so it doesn't expire
+				return true;
+			}
+		}else{// bad password
+			loc_display_login($title,$color,$mode,$message="Bad user/password combination.",$loginapp,$reg);
+			exit();
+		}// password
+			
+
+    }//we have username and password
+    //display password routine
+	loc_display_login($title,$color,$mode,$message="",$loginapp,$reg);
+    exit();
+}
+//------------------------------------
+function loc_delete_cookie($cookiename="login"){
+	setcookie($cookiename,"",time()-11000);
+}
+
+//------------------------------------
+function loc_get_cookie_data($cookiename="login"){
+	if(!isset($_COOKIE[$cookiename])){
+		return array();
+	}
+	//debug_string("loc_get_cookie_data()");
+	$cookstr = $_COOKIE[$cookiename];
+	$datalist = explode ( "+", $cookstr);
+	$result['name'] = $datalist[0];
+	$result['time'] = $datalist[1];
+	$result['hash'] = $datalist[2];
+	$result['expire'] = $datalist[3];
+	return $result;
+}
+//------------------------------------
+function loc_save_cookie_data($name,$hashtime,$hash,$cookexp=0,$cookiename="login"){
+	$data = $name."+".$hashtime."+".$hash."+".$cookexp;
+	//debug_string("loc_save_cookie_data()");
+	setcookie($cookiename,$data,$cookexp);
+
+}
+//------------------------------------
+/***********************************
+ * loc_GenerateRandomWord()
+ * creates a random word of alpha numerics of variable length
+ * $minlen: the minimum allowable length of the word
+ * $maxlen: the maximum allowable length of the word
+ * Return: a string of random characters
+ * side effects: none (well, it uses some random numbers which probably changes the seed)
+ *******************************************/
+function loc_GenerateRandomWord($minlen=10,$maxlen=25){
+//debug_string("loc_GenerateRandomWord($minlen,$maxlen)");
+    $charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";// character set
+    $charsetlen = strlen($charset);//lenth of character set
+
+    // generate a length value that various widely but tends to be around 75% of maxlen characters
+	$varlen = ($maxlen-$minlen)/2;
+	$maxlen = $maxlen-$varlen;
+	if ($minlen<1) $minlen=1;
+	if ($maxlen<6) $maxlen=6;
+    $len=mt_rand($minlen,$maxlen)+mt_rand(0,$varlen/3)+mt_rand(0,$varlen/3)+mt_rand(0,$varlen/3);
+	
+// generate a random string of characters using charset of len $len
+    for ($i = 1; $i <= $len; $i++){
+        $n = mt_rand(0,$charsetlen-1);
+        $word = $word.$charset[$n];
+    }
+    return $word;
+}
+
+//------------------------------------
+function loc_login_util_version(){
+    return '$Id: loc_login.php,v 1.11 2007/12/03 01:10:04 dmenconi Exp $';
+}
+/*
+ * $Log: loc_login.php,v $
+ * Revision 1.11  2007/12/03 01:10:04  dmenconi
+ * checkpoint
+ *
+ * Revision 1.10  2007/05/11 15:52:12  dmenconi
+ * added license information
+ *
+ * Revision 1.9  2007/03/10 16:29:39  dmenconi
+ * added code to update log database and to mail from: somewher
+ *
+ * Revision 1.2  2007/02/24 23:06:53  dave
+ * changed mysql_query to the new insert and update routines
+ *
+ * Revision 1.1  2007/02/24 21:14:12  dave
+ * Initial revision
+ *
+ * Revision 1.7  2007/02/08 08:39:08  dmenconi
+ * got the activation stuff to work
+ * removed a lot of debugs
+ * a few other minor tweaks
+ *
+ * Revision 1.6  2007/02/06 15:26:48  dmenconi
+ * fixed display login so it doesn't always display registration
+ *
+ * Revision 1.5  2007/02/06 06:05:05  dmenconi
+ * changed params to loc_GetAuth so that we pass PARAM array instead of 3 other variables!
+ *
+ * Revision 1.4  2007/01/19 04:37:28  dmenconi
+ * fixed problem with it not accepting cookies
+ *
+ * Revision 1.1  2005/11/29 20:26:03  dave
+ * Initial revision
+ *
+ * Revision 1.5  2005/11/22 02:12:31  dave
+ * checks to see if cookie has expired and, if it has, diallows it
+ *
+ * Revision 1.4  2005/11/21 12:26:45  dave
+ * reworked cookies so there is only one string in cookie not an  array
+ * rewored cookies so they contain the expiration date of the cookie
+ *
+ * Revision 1.3  2005/11/20 02:52:25  dave
+ * login seems to work
+ *
+ * Revision 1.2  2005/11/20 00:02:21  dave
+ * code is in but bugs persist
+ *
+ * Revision 1.1  2005/11/16 21:14:18  dave
+ * Initial revision
+ *
+*/
+?>
+@
+
+
+1.11
+log
+@checkpoint
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.10 2007/05/11 15:52:12 dmenconi Exp $ */
+d151 1
+a151 1
+
+d494 1
+a494 1
+    return '$Id: loc_login.php,v 1.10 2007/05/11 15:52:12 dmenconi Exp $';
+d498 3
+@
+
+
+1.10
+log
+@added license information
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.9 2007/03/10 16:29:39 dmenconi Exp $ */
+d75 1
+a75 1
+	Display_Generic_Footer($version,$lastmodified);
+d87 1
+a87 1
+	Display_Generic_Footer($version,$lastmodified);
+d185 1
+a185 1
+	Display_Generic_Footer($version,$lastmodified);
+d330 1
+a330 1
+debug_string(usertable,$usertable );
+d332 1
+a332 1
+debug_string(usertable,$usertable );
+d334 2
+a335 2
+    debug_string("---- loc_GetAuthenticated ----");
+debug_array("loc_GetAut PARAM",$PARAMS);
+d350 1
+a350 1
+		debug_string("get cookie");
+d354 1
+a354 1
+		debug_string("good cookie");
+d377 1
+a377 1
+debug_string("no valid cookie");
+d380 2
+a381 2
+debug_string("have username and password",$username.":".$pass);
+debug_string("doing mysql think");
+d383 1
+a383 1
+debug_string ("done with mysql thing");
+d494 1
+a494 1
+    return '$Id: loc_login.php,v 1.9 2007/03/10 16:29:39 dmenconi Exp $';
+d498 3
+@
+
+
+1.9
+log
+@added code to update log database and to mail from: somewher
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.2 2007/02/24 23:06:53 dave Exp $ */
+d4 19
+a22 4
+include_once "debug.php";
+include_once "mysql.php";
+include_once "miscfunc.php";
+include_once "htmlfuncs.php";
+d190 1
+a190 1
+	debug_string("loc_parse_newuser()");
+d217 2
+a218 2
+debug_string("http_host",$_SERVER['HTTP_HOST']);
+debug_string("URI",$_SERVER['REQUEST_URI']);
+d220 4
+a223 4
+debug_string("subject",$subject);
+debug_string("Url",$URL);
+debug_string("message",$message);
+debug_string("email",$email);
+d228 1
+a228 1
+debug_string("status",$status);
+d261 1
+a261 1
+debug_string("loc_check_auth_cookie()");
+d330 3
+d350 1
+d354 1
+d363 1
+a363 1
+	} else if((!$admin && 'active'==$type)|| 'admin'==$type){//we don't need an admin so any good cookie is good enough
+d375 1
+a375 1
+	}
+d377 1
+a377 1
+
+d380 2
+d383 1
+d494 1
+a494 1
+    return '$Id: loc_login.php,v 1.2 2007/02/24 23:06:53 dave Exp $';
+d498 3
+@
+
+
+1.8
+log
+@removed all debug stuff
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.7 2007/02/08 08:39:08 dmenconi Exp $ */
+d4 5
+a8 5
+include_once "../library/debug.php";
+include_once "../library/mysql.php";
+include_once "../library/miscfunc.php";
+include_once "../library/htmlfuncs.php";
+//include_once "../library/login.php";
+d89 2
+a90 1
+    $result = mysql_query($sql,$link) or die(mysql_error());
+d194 4
+a197 2
+	$sql = "insert into $usertable (username,userpass,email,name,temppw,type,actword) values ('".$username."','".$userpass."','".$email."','".$name."','','inactive','".$actword."')";
+    $result = mysql_query($sql,$link) or die(mysql_error());
+d209 1
+a209 1
+	$success = mail ($email, $subject, $message );
+d471 1
+a471 1
+    return '$Id: loc_login.php,v 1.7 2007/02/08 08:39:08 dmenconi Exp $';
+d475 6
+@
+
+
+1.7
+log
+@got the activation stuff to work
+removed a lot of debugs
+a few other minor tweaks
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.6 2007/02/06 15:26:48 dmenconi Exp $ */
+a80 2
+//debug_string("username",$username);
+//debug_string("actword",$actword);
+a88 1
+	//debug_string("update user",$sql);
+a193 1
+    //debug_string("sql",$sql);
+a200 1
+//debug_array("_SERVER",$_SERVER);
+a232 1
+//debug_string("hash",$hash);
+a243 4
+//debug_string("appword",$appword);
+//debug_string("cookexp",$cookexp);
+//debug_string("cookiename",$cookiename);
+//debug_string("username",$username);
+a245 1
+//debug_array("c_data",$c_data);
+a250 2
+//debug_string("c_username",$c_username);
+//debug_string("mark1");
+a251 1
+//debug_string("mark2");
+a255 4
+//debug_string("c_time",$c_time);
+//debug_string("c_hash",$c_hash);
+//debug_string("c_expire",$c_expire);
+//debug_string("mark3");
+a256 1
+//debug_string("mark4");
+a260 1
+//debug_string("mark5");
+a261 4
+//debug_string("hash",$hash);
+//debug_string("c_hash",$c_hash);
+//debug_string("c_username",$c_username);
+//debug_string("username",$username);
+a262 1
+//debug_string("mark6");
+a263 1
+//debug_string("mark7 true");
+a266 1
+//debug_string("mark8 false");
+a268 1
+//debug_string("mark9");
+a279 1
+//debug_array("cdata",$cdata);
+a280 1
+//debug_string("get_cookie 'name' set ",$cdata['name']);
+a282 1
+//debug_string("get_cookie 'name' not set return nothing");
+a292 3
+//debug_string("expiry",$expiry);
+//debug_string("cookexp",$cookexp);
+//debug_string("time",$time);
+a326 2
+//debug_string("username",$username);
+//debug_string("pass",$pass);
+a328 1
+//debug_array("cookie data",$c_data);
+a329 2
+//debug_string("----------------------------------------------");
+//debug_string("checking for valid cookie",$type);
+a332 1
+//debug_string("type1",$type);
+a334 1
+//debug_string("inactive",$type);
+a338 1
+//debug_string("creating cookie cuz I'm the admin",$type);
+a340 1
+//debug_string("creating cookie cuz I'v got a good cookie(?)",$type);
+a344 1
+//debug_string("weird cookie",$type);
+a348 1
+//debug_string("returning true",$type);
+a350 2
+//debug_string("deleting cookie",$type);
+		////debug_string("loc_check_auth_cookie failed!");
+a353 2
+//debug_string("no valid cookie",$type);
+		//debug_string("loc_check_auth_cookie failed!");
+a355 2
+//debug_string("username",$username);
+//debug_string("pass",$pass);
+a356 1
+//debug_string("have username and pass;about to look up",$type);
+a358 1
+//debug_string("we have *NO* valid user with that uname/pass",$type);
+a361 1
+//debug_string("we have a valid user",$type);
+a373 1
+//debug_string("the passwords match",$type);
+a389 1
+//debug_string("user inactive",$type);
+a393 1
+//debug_string("need admin",$type);
+a396 1
+//debug_string("we're good; create cookie",$type);
+a400 1
+//debug_string("bad password",$type);
+a407 1
+//debug_string("display password routine",$type);
+a434 3
+//debug_string("cookiedata",$data);
+//debug_array("get cookie data",loc_get_cookie_data());
+//debug_string("username",loc_get_username());
+a452 3
+//debug_string("maxlen",$maxlen);
+//debug_string("minlen",$minlen);
+//debug_string("varlen",$varlen);
+a456 1
+//debug_string("len",$len);
+a462 1
+    //debug_string("word",$word);
+d468 1
+a468 1
+    return '$Id: loc_login.php,v 1.6 2007/02/06 15:26:48 dmenconi Exp $';
+d472 5
+@
+
+
+1.6
+log
+@fixed display login so it doesn't always display registration
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.5 2007/02/06 06:05:05 dmenconi Exp $ */
+d15 2
+a16 1
+    debug_string("loc_get_userno");
+d19 1
+a19 2
+	$user = MYSQLComplexSelect($link,array("*"),array("user"),array("username='$username' limit 1"),array(),0);
+    $num_rows = count($user);
+d33 2
+a34 1
+	debug_string("loc_get_usertype");
+d37 1
+a37 1
+	$user = MYSQLComplexSelect($link,array("*"),array("user"),array("username='$username' limit 1"),array(),0);
+d45 3
+a47 2
+    debug_string("loc_get_userlist");
+	$users = MYSQLComplexSelect($link,array("*"),array("user"),array(),array(),0);
+a50 1
+// parameters
+d52 10
+a61 1
+function displaylocactivation($title,$color,$mode){
+d64 31
+a94 1
+function loc_activate(){
+d97 1
+a97 1
+// displayloclogin
+d106 1
+a106 1
+function displayloclogin($title,$color,$mode,$message="",$loginapp="index.php",$reg=false,$PARAMS=""){
+d108 1
+d112 2
+a113 2
+		if(isset($PARAMS['name'])) $username=$PARAMS['username'];
+		if(isset($PARAMS['userpass'])) $userpass=$PARAMS['userpass'];
+a115 1
+	debug_string("displayloclogin()");
+d132 2
+a133 2
+	<table><tr><td><b>Username: </b></td> <td><input type="text" name="username"><br></td></tr>
+	<tr><td><b>Password: </b></td><td>	<input type="password" name="password"><br></td></tr>
+d157 1
+a157 1
+<tr><td><b>Username: </b></td> <td><input type="text" name="username" value="$username"><br></td></tr>
+d164 1
+a164 1
+<b>An email will be sent to your email with an activation URL. <br>Your new account will work only <i>after</i> you activate. </b>
+d176 2
+d180 1
+a180 1
+	$username = $PARAMS['username'];
+d191 1
+a191 1
+    $users = MYSQLComplexSelect($link,array("*"),array("user"),array("username='".$username."'"),array(),0);
+d195 2
+a196 4
+	    
+		
+	$actword = GenerateRandomWord();
+	$sql = "insert into user (username,userpass,email,name,temppw,type,actword) values ('".$username."','".$userpass."','".$email."','".$name."','','inactive','".$actword."')";
+a198 1
+		   
+d200 29
+d233 1
+a233 1
+	debug_string("loc_create_auth_cookie()");
+d236 1
+a236 1
+	$cookexp = calc_cookie_expiry($appexpiry,$hashtime);
+d239 1
+a239 1
+	save_cookie_data($username,$hashtime,$hash,$cookexp,$cookiename);
+d255 1
+a255 1
+	$c_data = get_cookie_data($cookiename);// get the cookie data
+d305 1
+a305 1
+	debug_string("loc_get_username()");
+d307 2
+a308 2
+	$cdata = get_cookie_data($cookiename);
+debug_array("cdata",$cdata);
+d310 1
+a310 1
+debug_string("get_cookie 'name' set ",$cdata['name']);
+d313 1
+a313 1
+debug_string("get_cookie 'name' not set return nothing");
+d318 1
+a318 1
+//calc_cookie_expiry($expiry,$time){
+d320 2
+a321 2
+function calc_cookie_expiry($expiry,$time){
+debug_string('calc_cookie_expiry()');
+a338 1
+$mode: mode value to be passed back to the login application
+d341 2
+d345 1
+d348 1
+a348 1
+debug_string("loc_GetAut PARAM",$PARAMS);
+d352 11
+d364 2
+a365 5
+debug_string("username",$username);
+debug_string("pass",$pass);
+
+	$c_data = get_cookie_data($cookiename);
+debug_array("cookie data",$c_data);
+d367 2
+a368 2
+debug_string("----------------------------------------------");
+debug_string("checking for valid cookie",$type);
+d370 1
+a370 1
+	if (loc_check_auth_cookie($magic_word,calc_cookie_expiry($expiry,$c_data['time']),$cookiename)){
+d372 1
+a372 1
+debug_string("type1",$type);
+d375 1
+a375 1
+debug_string("inactive",$type);
+d377 1
+a377 1
+			displayloclogin($title,$color, $mode,$message="User in cookie is listed as inactive.",$loginapp,$reg);
+d380 1
+a380 1
+debug_string("creating cookie cuz I'm the admin",$type);
+d383 1
+a383 1
+debug_string("creating cookie cuz I'v got a good cookie(?)",$type);
+d388 1
+a388 1
+debug_string("weird cookie",$type);
+d390 1
+a390 1
+			displayloclogin($title,$color, $mode,$message="User in cookie has unknown type (cookie removed).",$loginapp,$reg);
+d393 1
+a393 1
+debug_string("returning true",$type);
+d396 2
+a397 2
+debug_string("deleting cookie",$type);
+		//debug_string("loc_check_auth_cookie failed!");
+d401 2
+a402 2
+debug_string("no valid cookie",$type);
+		debug_string("loc_check_auth_cookie failed!");
+d405 2
+a406 2
+debug_string("username",$username);
+debug_string("pass",$pass);
+d408 2
+a409 2
+debug_string("have username and pass;about to look up",$type);
+    	$users = MYSQLComplexSelect($link,array("*"),array("user"),array("username='".$username."'"),array(),0);
+d411 2
+a412 2
+debug_string("we have *NO* valid user with that uname/pass",$type);
+			displayloclogin($title,$color,$mode,$message="Bad user/password combination.",$loginapp,$reg);
+d415 1
+a415 1
+debug_string("we have a valid user",$type);
+d428 1
+a428 1
+debug_string("the passwords match",$type);
+d445 2
+a446 2
+debug_string("user inactive",$type);
+				displayloclogin($title,$color,$mode,$message="User is inactive. Activate user or login as different user.",$loginapp,$reg);
+d450 2
+a451 2
+debug_string("need admin",$type);
+				displayloclogin($title,$color,$mode,$message="Action requires user to be admin.",$loginapp,$reg);
+d454 1
+a454 1
+debug_string("we're good; create cookie",$type);
+d459 2
+a460 2
+debug_string("bad password",$type);
+			displayloclogin($title,$color,$mode,$message="Bad user/password combination.",$loginapp,$reg);
+d467 2
+a468 2
+debug_string("display password routine",$type);
+	displayloclogin($title,$color,$mode,$message="",$loginapp,$reg);
+d477 1
+a477 1
+function get_cookie_data($cookiename="login"){
+d481 1
+a481 1
+	debug_string("get_cookie_data()");
+d491 1
+a491 1
+function save_cookie_data($name,$hashtime,$hash,$cookexp=0,$cookiename="login"){
+d493 1
+a493 1
+	debug_string("save_cookie_data()");
+d495 3
+a497 4
+debug_string("cookiedata",$data);
+print " ";
+debug_array("get cookie data",get_cookie_data());
+debug_string("username",loc_get_username());
+d501 19
+a519 5
+function GenerateRandomWord($minlen=10,$maxlen=25){
+    $charset = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    $charsetlen = strlen($charset);
+    // generate a length value that various widely but tends to be around 20 characters
+	$maxlen = $maxlen-12;
+d522 4
+a525 1
+    $len=mt_rand($minlen,$maxlen)+mt_rand(0,4)+mt_rand(0,4)+mt_rand(0,4);
+d536 1
+a536 1
+    return '$Id: loc_login.php,v 1.5 2007/02/06 06:05:05 dmenconi Exp $';
+d540 3
+@
+
+
+1.5
+log
+@changed params to loc_GetAuth so that we pass PARAM array instead of 3 other variables!
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.4 2007/01/19 04:37:28 dmenconi Exp $ */
+d98 5
+d130 2
+a131 1
+EOF;
+d442 1
+a442 1
+    return '$Id: loc_login.php,v 1.4 2007/01/19 04:37:28 dmenconi Exp $';
+d446 3
+@
+
+
+1.4
+log
+@fixed problem with it not accepting cookies
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.1 2005/11/29 20:26:03 dave Exp $ */
+d8 1
+d15 1
+a15 1
+    //debug_string("loc_get_userno");
+d33 1
+a33 1
+	//debug_string("loc_get_usertype");
+d44 1
+a44 1
+    //debug_string("loc_get_userlist");
+d75 1
+a75 1
+	//debug_string("displayloclogin()");
+d159 1
+a159 1
+	//debug_string("loc_create_auth_cookie()");
+d175 1
+a175 1
+//debug_string("loc_check_auth_cookie()");
+d224 2
+a225 1
+
+d231 1
+a231 1
+	//debug_string("loc_get_username()");
+d234 1
+d236 1
+d239 1
+d244 2
+d247 1
+a247 1
+	//debug_string('calc_cookie_expiry()');
+d257 2
+a258 2
+$username: the username the user entered
+$pass: the password the user entered
+d269 1
+a269 1
+function loc_GetAuthenticated($username,$pass,$link,$magic_word,$cookiename="login",$admin=false,$expiry=0,$title="Application",$color='#F0F0F0',$mode="login",$loginapp="index.php", $reg=false){
+d271 8
+a278 3
+    //debug_string("---- loc_GetAuthenticated ----");
+//debug_string("username",$username);
+//debug_string("pass",$pass);
+d281 1
+a281 1
+//debug_array("cookie data",$c_data);
+d283 3
+a285 3
+//debug_string("----------------------------------------------");
+//debug_string("type0",$type);
+// check for a valid cookie
+d288 1
+a288 1
+//debug_string("type1",$type);
+d291 1
+a291 1
+//debug_string("type2",$type);
+d296 1
+a296 1
+//debug_string("type3",$type);
+d299 1
+a299 1
+//debug_string("type4",$type);
+d304 1
+a304 1
+//debug_string("type5",$type);
+d309 1
+a309 1
+//debug_string("type6",$type);
+d312 1
+a312 1
+//debug_string("type7",$type);
+d317 2
+a318 2
+//debug_string("type8",$type);
+		//debug_string("loc_check_auth_cookie failed!");
+d321 2
+a322 2
+//debug_string("username",$username);
+//debug_string("pass",$pass);
+d324 1
+a324 1
+//debug_string("type9",$type);
+d327 1
+a327 1
+//debug_string("typeA",$type);
+d331 1
+a331 1
+//debug_string("typeb",$type);
+d344 1
+a344 1
+//debug_string("typeC",$type);
+d348 1
+a348 1
+           $admin
+d357 2
+d361 1
+a361 1
+//debug_string("typeE",$type);
+d366 1
+a366 1
+//debug_string("typeF",$type);
+d370 1
+a370 1
+//debug_string("typeG",$type);
+d375 1
+a375 1
+//debug_string("typeH",$type);
+d383 1
+a383 1
+//debug_string("typeI",$type);
+d397 1
+a397 1
+	//debug_string("get_cookie_data()");
+d409 1
+a409 1
+	//debug_string("save_cookie_data()");
+d411 5
+d436 1
+a436 1
+    return '$Id: loc_login.php,v 1.1 2005/11/29 20:26:03 dave Exp $';
+d440 3
+@
+
+
+1.3
+log
+@removed print_r
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.2 2005/12/12 07:37:46 dave Exp $ */
+d8 4
+d25 6
+d41 1
+d49 1
+d52 1
+d55 11
+a65 1
+function displayloclogin($title,$color,$mode,$message="",$PARAMS=""){
+d90 1
+a90 1
+	<form method="post" action="index.php">
+d127 1
+d155 1
+d163 1
+d167 6
+a172 1
+
+d174 9
+a182 3
+    //debug_string("loc_check_auth_cookie()");
+	$c_data = get_cookie_data($cookiename);
+    if (!isset($c_data)){
+d185 6
+a190 2
+	$c_username = $c_data['name'];
+    if (""==$username){$username=$c_username;}
+d194 7
+a200 3
+
+    $hash = md5($appword.$username.$c_time.$cookexp);
+	if ($c_expire<time()){
+d204 9
+d214 2
+d218 1
+d221 1
+d223 5
+a229 1
+	//debug_string("cookiename",$cookiename);
+d238 1
+d243 3
+d248 15
+a262 1
+function loc_GetAuthenticated($username,$pass,$link,$magic_word,$cookiename="login",$admin=false,$expiry=0,$title="Application",$color='#F0F0F0',$mode="login"){
+d265 2
+d269 6
+a274 3
+
+    $message = "";
+    if (loc_check_auth_cookie($magic_word,calc_cookie_expiry($expiry,$c_data['time']),$cookiename)){
+d276 1
+d279 1
+d281 1
+a281 1
+			displayloclogin($title,$color, $mode,$message="User in cookie is listed as inactive.");
+d284 4
+a287 2
+			loc_create_auth_cookie($username,$expiry,$magic_word,$cookiename);//reset cookie so it doesn't expire
+       	} else if((!$admin && 'active'==$type)|| 'admin'==$type){//we don't need an admin so any good cookie is good enough
+d290 1
+d292 1
+d294 1
+a294 1
+			displayloclogin($title,$color, $mode,$message="User in cookie has unknown type (cookie removed).");
+d297 1
+d300 1
+d305 2
+d309 2
+d312 1
+d315 2
+a316 1
+			displayloclogin($title,$color,$mode,$message="Bad user/password combination.");
+d319 1
+d332 1
+d347 2
+a348 1
+				displayloclogin($title,$color,$mode,$message="User is inactive. Activate user or login as different user.");
+d352 2
+a353 1
+				displayloclogin($title,$color,$mode,$message="Action requires user to be admin.");
+d356 1
+d361 2
+a362 1
+			displayloclogin($title,$color,$mode,$message="Bad user/password combination.");
+d369 2
+a370 1
+	displayloclogin($title,$color,$mode,$message="");
+d373 1
+d378 1
+d380 1
+a380 4
+	//debug_string("get_cookie_data()");
+	//debug_string("cookiename",$cookiename);
+	//debug_array("cookies",$_COOKIE);
+	if(!isset($_COOKIE[$cookiename])|| !is_string($_COOKIE[$cookiename])){
+d383 1
+a384 1
+
+d392 1
+d398 1
+d415 1
+d417 1
+a417 1
+    return '$Id: loc_login.php,v 1.2 2005/12/12 07:37:46 dave Exp $';
+d421 2
+a422 2
+ * Revision 1.2  2005/12/12 07:37:46  dave
+ * check point -- lots of changes including extending the capabilities considerably
+@
+
+
+1.2
+log
+@check point -- lots of changes including extending the capabilities considerably
+@
+text
+@d2 1
+a2 1
+/* $Id: loc_login.php,v 1.5 2005/11/22 02:12:31 dave Exp $ */
+a169 1
+	print_r($cdata);
+d309 1
+a309 1
+    return '$Id: loc_login.php,v 1.5 2005/11/22 02:12:31 dave Exp $';
+d313 3
+@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@d42 1
+a42 1
+function displayloclogin($title,$color,$mode,$message=""){
+d44 7
+d55 1
+a55 1
+	<center>| <a href="index.php?mode=join">Register</a> | <a href="index.php?mode=list">Return to $title </a> |</center>
+d58 5
+d73 28
+d104 27
+d167 1
+d170 1
+d273 4
+a276 1
+	if(!isset($_COOKIE[$cookiename])){
+a278 1
+	//debug_string("get_cookie_data()");
+d280 1
+d293 16
+@
